@@ -700,7 +700,9 @@ function viewSettings(view) {
   change.addEventListener("click", () => showLevelModal(false));
   lv.append(change);
   panel.append(lv);
-  view.append(panel);
+  const about = el("div", { className: "panel" });
+  about.innerHTML = '<h2>About</h2><p class="muted">SkillBridge AI is open source. Source code: <a href="https://github.com/Kiwmoj/SkillBridgeAI" target="_blank" rel="noopener">github.com/Kiwmoj/SkillBridgeAI ↗</a></p>';
+  view.append(panel, about);
 }
 
 // ---------- boot ----------

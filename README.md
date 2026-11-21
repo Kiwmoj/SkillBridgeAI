@@ -1,5 +1,7 @@
 # SkillBridge AI
 
+**Source code:** https://github.com/Kiwmoj/SkillBridgeAI
+
 A Windows desktop application (PyQt6) and FastAPI backend for career exploration, skill-gap analysis, learning roadmaps, portfolio feedback, project ideas, opportunity discovery, progress analytics, and moderated community knowledge — built on official O*NET occupational data, with a provider-independent AI layer and a consent-based path toward a future SkillBridge model.
 
 ## Architecture
