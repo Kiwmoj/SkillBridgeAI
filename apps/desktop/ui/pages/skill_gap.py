@@ -78,4 +78,5 @@ class SkillGapPage(Page):
             return
         question = "Use this self-reported skill comparison to suggest learning priorities:\n" + report[:4600]
         self.run(lambda: self.backend.generate_guidance("Skill gap guidance", question),
-                 lambda result: self.output.setPlainText(generated_text(result["answer"], result["sources"])))
+                 lambda result: self.output.setPlainText(generated_text(result["answer"], result["sources"])),
+                 self.show_in(self.output))

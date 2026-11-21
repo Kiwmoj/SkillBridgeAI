@@ -48,4 +48,5 @@ class PortfolioPage(Page):
         if QMessageBox.question(self.context.parent, "Send image for AI review?", AI_NOTICE) != QMessageBox.StandardButton.Yes:
             return
         self.run(lambda: self.backend.evaluate_portfolio(item["id"]),
-                 lambda result: self.output.setPlainText("AI-generated feedback\n\n" + result["evaluation"]))
+                 lambda result: self.output.setPlainText("AI-generated feedback\n\n" + result["evaluation"]),
+                 self.show_in(self.output))

@@ -64,4 +64,4 @@ class LearningRoadmapPage(Page):
                 if skill.strip()
             ],
         }
-        self.run(lambda: self.backend.create_roadmap(payload), self.show_roadmap)
+        self.run(lambda: self.backend.create_roadmap(payload), self.show_roadmap, self.show_in(self.output))

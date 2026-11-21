@@ -59,4 +59,5 @@ class ProjectsPage(Page):
             lambda result: self.output.setPlainText(generated_text(
                 f"{result['title']}\n\n{result['description']}", result["sources"],
             )),
+            self.show_in(self.output),
         )

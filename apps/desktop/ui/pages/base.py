@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QTextEdit, QWidget
 
 from apps.desktop.controllers.session import SessionController
 from apps.desktop.controllers.tasks import TaskRunner
@@ -40,3 +40,9 @@ class Page(QWidget):
 
     def notify(self, text: str) -> None:
         self.context.tasks.message.emit(text)
+
+    def show_in(self, output: QTextEdit) -> Callable[[str], None]:
+        """An error handler that writes a readable failure message into an output panel."""
+        def handle(message: str) -> None:
+            output.setPlainText("This request could not be completed.\n\n" + message)
+        return handle
