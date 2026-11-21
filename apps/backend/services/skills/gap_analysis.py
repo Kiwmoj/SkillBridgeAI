@@ -6,6 +6,7 @@ from apps.backend.repositories import occupations as occupations_repository
 from apps.backend.repositories import skills as repository
 from apps.backend.schemas.skills import SkillAssessmentRequest, SkillGapRequest
 from apps.backend.services.careers.explorer import is_reported
+from apps.backend.services.levels import LEVELS, effective_level
 
 UNVERIFIED_NOTICE = (
     "This occupation is not represented by imported official O*NET data. "
@@ -64,8 +65,20 @@ def analyze(db: Session, user_id: int, request: SkillGapRequest) -> dict:
     notice = MATCH_NOTICE
     if matched_from:
         notice = f'"{matched_from}" is not an exact O*NET title; showing the closest match, {occupation.title}. {MATCH_NOTICE}'
+    level = effective_level(db, user_id)
+    gaps.sort(key=lambda item: item["rating"] or 0, reverse=True)
+    strengths.sort(key=lambda item: item["rating"] or 0, reverse=True)
+    count = LEVELS[level]["focus_gaps"]
+    guidance = {
+        "beginner": f"New to this? Do not try to learn everything. Start with just these {count} skills, one at a time.",
+        "intermediate": f"Focus on these {count} skills next. They matter most for this career and you have not listed them.",
+        "advanced": f"Your priority list: the {count} most important skills you have not shown evidence for.",
+    }[level]
     return {
         "occupation": occupation.title,
+        "level": level,
+        "focus": gaps[:count],
+        "guidance": guidance,
         "strengths": strengths,
         "gaps": gaps,
         "notice": notice,

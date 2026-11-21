@@ -245,3 +245,24 @@ textarea { min-height: 90px; resize: vertical; }
   .bar-row { grid-template-columns: 96px 1fr 34px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Skill levels */
+.level-chip { width: 100%; background: rgba(139, 92, 246, .14); border: 1px solid rgba(139, 92, 246, .4); color: #d8ccff; box-shadow: none; padding: 8px 10px; font-size: 12px; }
+.level-chip:hover { background: rgba(139, 92, 246, .24); box-shadow: none; }
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(3, 6, 20, .78); backdrop-filter: blur(6px); animation: fadeUp .25s ease both; overflow-y: auto; }
+.modal-card { width: 100%; max-width: 760px; padding: 28px; border-radius: 22px; background: linear-gradient(160deg, #141d4a, #0b1230); border: 1px solid var(--border-strong); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
+.level-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+.level-card { text-align: left; padding: 18px; border-radius: 16px; background: rgba(10, 17, 40, .8); border: 1px solid var(--border); color: var(--text); box-shadow: none; transition: transform .2s ease, border-color .2s ease; }
+.level-card:hover { transform: translateY(-3px); border-color: var(--primary-hover); box-shadow: none; }
+.level-card.selected { border-color: var(--accent); background: linear-gradient(160deg, rgba(59, 130, 246, .18), rgba(139, 92, 246, .18)); }
+.level-card b { display: block; font-size: 17px; margin-bottom: 6px; }
+.level-card span { color: var(--muted); font-size: 13px; font-weight: 400; }
+.level-banner { margin-top: 18px; padding: 16px 20px; border-radius: var(--radius); background: linear-gradient(90deg, rgba(59, 130, 246, .16), rgba(139, 92, 246, .16)); border: 1px solid rgba(99, 120, 255, .3); }
+.path-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 12px; }
+.path { padding: 14px; border-radius: 13px; background: rgba(10, 17, 40, .7); border: 1px solid var(--border); }
+.path.common { border-color: rgba(52, 211, 153, .45); }
+.path b { display: block; margin-bottom: 4px; }
+.tips { margin: 8px 0 0; padding-left: 20px; }
+.tips li { margin: 6px 0; }
+@media (max-width: 760px) { .level-grid { grid-template-columns: 1fr; } .modal-card { padding: 20px; } }
+@media (max-width: 620px) { .level-chip { font-size: 9px; padding: 6px 2px; } }

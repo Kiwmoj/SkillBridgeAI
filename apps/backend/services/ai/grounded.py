@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from apps.backend.core.exceptions import ExternalServiceError
 from apps.backend.models import User
 from apps.backend.repositories import analytics as usage_repository
+from apps.backend.services import levels
 from apps.backend.services.ai.providers import AIProviderError
 from apps.backend.services.ai.retrieval import retrieval_service, source_context
 from apps.backend.services.ai.service import ai_service
@@ -26,7 +27,7 @@ def generate_grounded(db: Session, user: User, feature: str, query: str,
     """Return (answer, sources). ``build_prompt`` receives the formatted source context."""
     started = monotonic()
     records = retrieval_service.search(db, query)
-    prompt = build_prompt(source_context(records))
+    prompt = levels.prompt_note(db, user.id) + "\n\n" + build_prompt(source_context(records))
     try:
         answer = ai_service.generate(prompt)
     except AIProviderError as exc:

@@ -13,7 +13,9 @@ from apps.backend.schemas.roadmaps import LearningActivityRequest, RoadmapReques
 from apps.backend.services.ai.grounded import generate_grounded
 from apps.backend.services.ai.service import ai_service
 from apps.backend.services.careers.explorer import resolve_occupation
+from apps.backend.services.careers.pathways import pathways
 from apps.backend.services.careers.profile import build_profile
+from apps.backend.services.levels import effective_level, normalize
 
 SOURCE_LABEL = "Built from official O*NET data for this occupation (not AI-generated)."
 
@@ -22,8 +24,16 @@ def _known(name: str, current: set[str]) -> bool:
     return name.casefold() in current
 
 
-def build_source_plan(profile: dict, current_skills: list[str]) -> tuple[str, list[str]]:
-    """Return (readable plan, activity titles) from a career profile."""
+LEVEL_INTRO = {
+    "beginner": "Written for a beginner: no prior experience needed. Take one small step at a time.",
+    "intermediate": "Written for an intermediate learner: it builds on the basics you already know.",
+    "advanced": "Written for an advanced learner: it focuses on depth, specialization and leadership.",
+}
+
+
+def build_source_plan(profile: dict, current_skills: list[str], level: str = "beginner") -> tuple[str, list[str]]:
+    """Return (readable plan, activity titles) from a career profile, adapted to the learner's level."""
+    level = normalize(level)
     current = {skill.casefold().strip() for skill in current_skills}
     occupation = profile["occupation"]["title"]
     steps: list[tuple[str, list[str]]] = []
@@ -36,27 +46,60 @@ def build_source_plan(profile: dict, current_skills: list[str]) -> tuple[str, li
             f"{e['label']} ({e['percent_of_workers']}%)" for e in education))
     if zone:
         prep.append(f"{zone['name']}. {zone['education'] or ''}".strip())
-    steps.append(("Understand the requirements", prep or ["Review the career profile in Career Explorer."]))
 
-    knowledge = [k for k in profile["knowledge"] if not _known(k["name"], current)][:4]
-    steps.append(("Build foundational knowledge", [f"Learn {k['name']}" for k in knowledge]))
+    knowledge = [k for k in profile["knowledge"] if not _known(k["name"], current)]
+    skills = [s for s in profile["skills"] if not _known(s["name"], current)]
+    tasks = profile["tasks"]
+    tools = profile["technology"]["in_demand"] or profile["technology"]["other"]
+    ways = [p for p in pathways(profile) if p["id"] in ("university", "vocational", "apprenticeship")]
+    route_lines = [f"{p['label']}: {p['summary']}" + (f" ({p['percent_of_workers']}% of workers)"
+                                                       if p["percent_of_workers"] else "") for p in ways]
 
-    skills = [s for s in profile["skills"] if not _known(s["name"], current)][:5]
-    steps.append(("Develop core skills", [f"Practise {s['name']}" for s in skills]))
+    if level == "beginner":
+        description = (profile["occupation"].get("description") or "").strip()
+        steps.append(("Get to know this career", [description or "Read the career profile in Career Explorer."]
+                      + [item for item in prep if item]))
+        steps.append(("Learn the basics, one idea at a time",
+                      [f"Start with a beginner introduction to {k['name']}" for k in knowledge[:3]]))
+        steps.append(("Practise simple skills", [f"Try one easy exercise in {s['name']}" for s in skills[:3]]))
+        steps.append(("Try one real task, with guidance",
+                      [f"Read this task and rewrite it in your own words: {task}" for task in tasks[:1]]))
+        steps.append(("Choose how you want to learn", route_lines))
+        steps.append(("Take your first steps", [
+            "Save one career and one opportunity that interests you under Opportunities",
+            "Write down one question you still have and look it up",
+        ]))
+    elif level == "intermediate":
+        steps.append(("Understand the requirements", prep or ["Review the career profile in Career Explorer."]))
+        steps.append(("Fill your knowledge gaps", [f"Learn {k['name']}" for k in knowledge[:4]]))
+        steps.append(("Develop core skills", [f"Practise {s['name']} with a hands-on exercise" for s in skills[:5]]))
+        steps.append(("Practise with real work tasks", [f"Project: {task}" for task in tasks[:3]]))
+        steps.append(("Learn the tools used on the job", [f"Get hands-on with {tool}" for tool in tools[:4]]))
+        steps.append(("Choose and compare pathways", route_lines))
+        steps.append(("Earn credentials and apply", [
+            "Shortlist programs, certifications or apprenticeships under Opportunities",
+            "Add a portfolio piece showing your best project",
+            "Save at least one opportunity and update its status under Opportunities",
+        ]))
+    else:
+        top = sorted(profile["skills"], key=lambda s: s["importance"] or 0, reverse=True)
+        steps.append(("Audit your strengths against the top requirements",
+                      [f"Rate yourself on {s['name']} and list evidence of your level" for s in top[:4]]))
+        steps.append(("Deepen specialist knowledge", [f"Go deeper on {k['name']}: read advanced material and "
+                                                      "apply it to a real case" for k in knowledge[:3]]))
+        steps.append(("Capstone work with real constraints", [
+            f"Capstone: {task} Add constraints such as time, budget, quality metrics or users." for task in tasks[:3]]))
+        steps.append(("Master professional tools", [f"Reach expert level with {tool}" for tool in tools[:3]]))
+        steps.append(("Specialize and lead", [
+            "Choose one specialization and define what makes your work stand out",
+            "Mentor or teach someone else and write up what you learned",
+        ]))
+        steps.append(("Credentials and next roles", route_lines + [
+            "Add a case study with measurable results to your portfolio",
+            "Shortlist advanced certifications or senior roles under Opportunities",
+        ]))
 
-    tasks = profile["tasks"][:3]
-    steps.append(("Practise with real work tasks", [f"Project: {task}" for task in tasks]))
-
-    tools = profile["technology"]["in_demand"][:4] or profile["technology"]["other"][:4]
-    steps.append(("Learn the tools used on the job", [f"Get hands-on with {tool}" for tool in tools]))
-
-    steps.append(("Earn credentials and apply", [
-        "Shortlist education or training         programs under Opportunities",
-        "Add a portfolio piece showing your best project",
-                "Save at least one opportunity and update its status under Opportunities",
-    ]))
-
-    lines = [f"Learning roadmap: {occupation}", SOURCE_LABEL, ""]
+    lines = [f"Learning roadmap: {occupation}", f"Level: {level.title()}", LEVEL_INTRO[level], SOURCE_LABEL, ""]
     activities: list[str] = []
     for number, (title, items) in enumerate(steps, start=1):
         items = [item for item in items if item]
@@ -65,8 +108,10 @@ def build_source_plan(profile: dict, current_skills: list[str]) -> tuple[str, li
         lines.append(f"Step {number}: {title}")
         lines.extend(f"  • {item}" for item in items)
         lines.append("")
-        activities.extend(f"Step {number}: {item}"[:255] for item in items if not item.startswith("Most common")
-                          and not item.startswith("Job Zone"))
+        activities.extend(f"Step {number}: {item}"[:255] for item in items
+                          if not item.startswith(("Most common", "Job Zone", "Read the career profile"))
+                          and not item.startswith(tuple(f"{p['label']}:" for p in ways))
+                          and item != (profile["occupation"].get("description") or "").strip())
     if current:
         lines.append("Skipped because you already reported them: " + ", ".join(sorted(current_skills)))
     return "\n".join(lines).strip(), activities
@@ -78,7 +123,7 @@ def create_roadmap(db: Session, user: User, request: RoadmapRequest) -> dict:
         if occupation is None:
             raise NotFoundError("No imported occupation matches. Pick one in Career Explorer first.")
         profile = build_profile(db, occupation.id)
-        content, activity_titles = build_source_plan(profile, request.current_skills)
+        content, activity_titles = build_source_plan(profile, request.current_skills, effective_level(db, user.id))
         records = [{"id": "S1", "source_type": "onet", "title": occupation.title,
                     "reference": profile["attribution"]["credit"],
                     "url": f"https://www.onetonline.org/link/summary/{occupation.onet_soc_code}",
@@ -108,7 +153,8 @@ def create_roadmap(db: Session, user: User, request: RoadmapRequest) -> dict:
     db.commit()
     db.refresh(roadmap)
     return {"id": roadmap.id, "occupation_title": roadmap.occupation_title, "content": content,
-            "sources": records, "generated": generated, "activities": len(activity_titles)}
+            "sources": records, "generated": generated, "activities": len(activity_titles),
+            "level": effective_level(db, user.id)}
 
 
 def list_roadmaps(db: Session, user_id: int) -> list[dict]:

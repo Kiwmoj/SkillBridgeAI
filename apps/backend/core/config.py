@@ -1,4 +1,4 @@
-﻿"""Centralized backend configuration.
+"""Centralized backend configuration.
 
 Every backend module reads its settings from here so that environment handling,
 validation, and the development/production split live in one place.
@@ -19,7 +19,7 @@ LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
 PLACEHOLDER_SECRETS = ("change-this-secret-in-production", "local-development-only-change-me")
 DEFAULT_DATABASE_URL = "sqlite:///./skillbridge.db"
 API_PREFIX = "/api/v1"
-SCHEMA_REVISION = "20261122_platform"
+SCHEMA_REVISION = "20261123_skill_level"
 APP_VERSION = "2.0.0"
 
 

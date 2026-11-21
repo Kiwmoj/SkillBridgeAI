@@ -114,14 +114,61 @@ function signOut() {
 
 async function enterApp() {
   try { me = await api("/auth/me"); } catch { signOut(); return; }
+  try { levelInfo = await api("/profile/level"); } catch { levelInfo = null; }
   $("#auth").classList.add("hidden");
   $("#app").classList.remove("hidden");
   $("#who").textContent = me.name;
   $("#who-role").textContent = me.role;
   $("#avatar").textContent = (me.name || "?").trim().charAt(0).toUpperCase();
   buildNav();
+  updateLevelChip();
   go("Dashboard");
+  if (levelInfo && !levelInfo.skill_level) showLevelModal(true);
 }
+
+// ---------- skill level ----------
+let levelInfo = null;
+const levelName = () => {
+  const id = levelInfo?.effective_level || "beginner";
+  return levelInfo?.levels?.find((l) => l.id === id)?.label || "Beginner";
+};
+function updateLevelChip() {
+  const chip = $("#level-chip");
+  chip.textContent = levelInfo?.skill_level ? `Level: ${levelName()} · change` : "Choose your level";
+  chip.onclick = () => showLevelModal(false);
+}
+function showLevelModal(first) {
+  const modal = $("#level-modal");
+  modal.innerHTML = "";
+  const card = el("div", { className: "modal-card" });
+  card.append(
+    el("h1", { id: "level-title" }, first ? "Where are you starting from?" : "Change your skill level"),
+    el("p", { className: "muted" }, "There is no wrong answer. Everything in SkillBridge adapts to this: your roadmaps, projects, skill analysis and AI explanations. You can change it any time."),
+  );
+  const grid = el("div", { className: "level-grid" });
+  (levelInfo?.levels || []).forEach((l) => {
+    const b = el("button", { type: "button", className: "level-card" + (levelInfo.skill_level === l.id ? " selected" : "") },
+      el("b", {}, l.label), el("span", {}, l.summary));
+    b.addEventListener("click", async () => {
+      try {
+        levelInfo = await api("/profile/level", { method: "PUT", body: { skill_level: l.id } });
+        modal.classList.add("hidden");
+        updateLevelChip();
+        toast(`Level set to ${l.label}. New roadmaps and projects will match it.`);
+        go(currentPage);
+      } catch (e) { toast(e.message); }
+    });
+    grid.append(b);
+  });
+  card.append(grid);
+  const close = el("button", { className: "ghost small", type: "button" }, first ? "Not sure yet? Skip for now (we'll keep things beginner-friendly)" : "Close");
+  close.addEventListener("click", () => modal.classList.add("hidden"));
+  card.append(close);
+  modal.append(card);
+  modal.classList.remove("hidden");
+}
+const levelNote = () => el("div", { className: "notice", style: "background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.35);color:#d8ccff" },
+  `Adapted for your level: ${levelName()}. `, el("a", { href: "#", onclick: (e) => { e.preventDefault(); showLevelModal(false); } }, "Change level"));
 
 // ---------- navigation ----------
 const NAV = [
@@ -157,7 +204,9 @@ function buildNav() {
     nav.append(b);
   });
 }
+let currentPage = "Dashboard";
 function go(page) {
+  currentPage = page;
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.getAttribute("aria-label") === page));
   const view = $("#view");
   view.innerHTML = "";
@@ -210,6 +259,28 @@ async function viewDashboard(view) {
   const learnPanel = el("section", { className: "panel", innerHTML: `<h2>Learning progress</h2>${skeleton(1)}` });
   charts.append(statusPanel, learnPanel);
   view.append(charts);
+
+  const levelTips = {
+    beginner: "You are starting from zero, and that is fine. Pick a career below, open it, and follow the beginner steps.",
+    intermediate: "You have the basics. Use the Skill Gap Analyzer to find what to learn next, then build a project.",
+    advanced: "Go deep: pick a specialization, take on a capstone project and aim for senior-level credentials.",
+  };
+  view.append(el("div", { className: "level-banner" },
+    el("b", {}, `Your level: ${levelName()}${levelInfo?.skill_level ? "" : " (default until you choose)"}`),
+    el("div", { className: "muted" }, levelTips[levelInfo?.effective_level || "beginner"])));
+  const recPanel = el("section", { className: "panel", innerHTML: `<h2>Careers to explore at your level</h2>${skeleton(1)}` });
+  view.append(recPanel);
+  api("/occupations/recommended").then((r) => {
+    recPanel.innerHTML = "<h2>Careers to explore at your level</h2><p class=\"muted tiny\">Chosen by how much preparation O*NET says each career needs (Job Zone). Every career is open to anyone.</p>";
+    if (!r.careers.length) { recPanel.insertAdjacentHTML("beforeend", empty("No careers loaded", "Career data has not been imported yet.")); return; }
+    const chips = el("div", { className: "chips" });
+    r.careers.forEach((c) => {
+      const b = el("button", { className: "ghost small", type: "button" }, c.title);
+      b.addEventListener("click", () => { go("Career Explorer"); setTimeout(() => window.openCareer && window.openCareer(c.id), 50); });
+      chips.append(b);
+    });
+    recPanel.append(chips);
+  }).catch((e) => { recPanel.innerHTML = "<h2>Careers to explore at your level</h2>" + errorBox(e.message); });
 
   const quick = el("section", { className: "panel" });
   quick.append(el("h2", {}, "Jump in"));
@@ -270,6 +341,7 @@ async function viewCareers(view) {
   view.append(panel);
   const detail = el("div", { className: "panel hidden" });
   view.append(detail);
+  window.openCareer = (id) => { showDetail(id, detail); detail.scrollIntoView({ behavior: "smooth", block: "start" }); };
 
   async function search() {
     results.innerHTML = skeleton(3);
@@ -310,12 +382,23 @@ async function showDetail(id, detail) {
       try { await api(`/occupations/saved/${id}`, { method: "PUT" }); toast("Career saved."); } catch (e) { toast(e.message); }
     });
     detail.append(save);
+    try {
+      const p = await api(`/occupations/${id}/profile`);
+      const paths = p.pathways.map((w) => `<div class="path ${w.most_common ? "common" : ""}"><b>${esc(w.label)}</b>
+        <span class="muted tiny">${w.percent_of_workers != null ? `${w.percent_of_workers}% of workers · ` : ""}${esc(w.source)}</span>
+        <p class="muted" style="margin:6px 0 0">${esc(w.summary)}</p>${w.most_common ? '<span class="badge ok" style="margin-top:8px">Most common route</span>' : ""}</div>`).join("");
+      const zone = p.job_zone ? `<p class="muted"><b>How much preparation?</b> ${esc(p.job_zone.name)}. ${esc(p.job_zone.education || "")}</p>` : "";
+      detail.insertAdjacentHTML("beforeend",
+        `<h2 style="margin-top:20px">Getting started at your level (${esc(levelName())})</h2><ul class="tips">${p.getting_started.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` +
+        `<h2 style="margin-top:20px">Ways into this career</h2>${zone}<div class="path-grid">${paths}</div>`);
+    } catch (e) { detail.insertAdjacentHTML("beforeend", errorBox(e.message)); }
   } catch (e) { detail.innerHTML = errorBox(e.message); }
 }
 
 // ---------- Skill Gap ----------
 function viewSkillGap(view) {
   view.append(head("Skill Gap Analyzer", "Compare your skills with official O*NET requirements"));
+  view.append(levelNote());
   const panel = el("div", { className: "panel" });
   const title = el("input", { placeholder: "Occupation title (e.g. Registered Nurses)" });
   const skills = el("textarea", { placeholder: "One skill per line, e.g.\nCritical Thinking\nActive Listening\nPatient care" });
@@ -336,10 +419,13 @@ function viewSkillGap(view) {
       const chips = (arr, cls, cap = 24) => arr.length
         ? `<div class="chips">${[...arr].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, cap).map((x) => `<span class="chip ${cls}">${esc(x.name)}${x.rating != null ? ` · ${esc(x.rating)}` : ""}</span>`).join("")}${arr.length > cap ? `<span class="chip">+${arr.length - cap} more</span>` : ""}</div>`
         : '<p class="muted">None found.</p>';
+      const rest = r.gaps.filter((g) => !(r.focus || []).some((f) => f.name === g.name));
       out.innerHTML =
-        `<div class="row center" style="margin-top:18px"><h2 class="grow">${esc(r.occupation)}</h2><span class="badge">${esc(r.source)}</span></div>` +
+        `<div class="row center" style="margin-top:18px"><h2 class="grow">${esc(r.occupation)}</h2><span class="badge">${esc(r.source)}</span><span class="badge">${esc(levelName())} view</span></div>` +
         (r.notice ? `<div class="notice">${esc(r.notice)}</div>` : "") +
-        `<h2 style="margin-top:16px">Strengths</h2>${chips(r.strengths, "good")}<h2 style="margin-top:16px">Gaps to develop</h2>${chips(r.gaps, "gap")}`;
+        (r.guidance ? `<div class="level-banner" style="margin-top:14px"><b>Start here</b><div class="muted">${esc(r.guidance)}</div></div>${chips(r.focus || [], "gap", 12)}` : "") +
+        `<h2 style="margin-top:16px">Strengths you already have</h2>${r.strengths.length ? chips(r.strengths, "good") : '<p class="muted">Nothing listed yet. That is fine, add skills above, or just follow the Start here list.</p>'}` +
+        (rest.length ? `<details style="margin-top:16px"><summary class="muted">See all other skills for this career (${rest.length})</summary>${chips(rest, "gap", 40)}</details>` : "");
     } catch (e) { out.innerHTML = errorBox(e.message); } finally { setBusy(btn, false, "Analyzing…"); }
   });
 }
@@ -347,6 +433,7 @@ function viewSkillGap(view) {
 // ---------- Roadmaps ----------
 function viewRoadmaps(view) {
   view.append(head("Learning Roadmaps", "Personalized plans built from O*NET occupation data"));
+  view.append(levelNote());
   const panel = el("div", { className: "panel" });
   const title = el("input", { placeholder: "Target occupation (e.g. Software Developers)" });
   const skills = el("textarea", { placeholder: "Skills you already have, one per line (optional)", style: "min-height:70px" });
@@ -418,6 +505,7 @@ function viewRoadmaps(view) {
 const PROJECT_STATUSES = ["planned", "in_progress", "completed"];
 function viewProjects(view) {
   view.append(head("Project Studio", "Career-related projects with trackable milestones"));
+  view.append(levelNote());
   const panel = el("div", { className: "panel" });
   const occ = el("input", { placeholder: "Occupation (e.g. Software Developers)" });
   const exp = el("textarea", { placeholder: "Your experience level or interests (optional)", style: "min-height:70px" });
@@ -606,6 +694,12 @@ function viewSettings(view) {
   const panel = el("div", { className: "panel" });
   panel.innerHTML = `<h2>Account</h2><p class="muted">${esc(me.name)} · ${esc(me.email)} <span class="badge">${esc(me.role)}</span></p>`;
   panel.append(el("p", { className: "muted tiny", textContent: "Career guidance uses verified O*NET references by default. Optional text generation is managed privately by the server operator. Your data stays on the server you connect to." }));
+  const lv = el("div", { style: "margin-top:16px" }, el("h2", {}, "Skill level"),
+    el("p", { className: "muted" }, `Current level: ${levelInfo?.skill_level ? levelName() : "not chosen yet (beginner-friendly defaults)"}`));
+  const change = el("button", { type: "button", className: "small" }, "Change skill level");
+  change.addEventListener("click", () => showLevelModal(false));
+  lv.append(change);
+  panel.append(lv);
   view.append(panel);
 }
 

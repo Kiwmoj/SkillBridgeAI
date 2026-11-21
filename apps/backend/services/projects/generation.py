@@ -14,6 +14,7 @@ from apps.backend.services.ai.grounded import generate_grounded
 from apps.backend.services.ai.service import ai_service
 from apps.backend.services.careers.explorer import resolve_occupation
 from apps.backend.services.careers.profile import build_profile
+from apps.backend.services.levels import effective_level, normalize
 
 PROJECT_STATUSES = {"planned", "in_progress", "completed"}
 DEFAULT_MILESTONES = (
@@ -29,19 +30,28 @@ def _milestones(titles) -> list[dict]:
     return [{"title": title[:255], "done": False} for title in titles]
 
 
-def build_source_brief(profile: dict, title: str, experience: str) -> tuple[str, list[dict]]:
+LEVEL_SCOPE = {
+    "beginner": "Guided mini-project for a beginner: small steps, nothing assumed. Aim to finish one simple version.",
+    "intermediate": "Practical project for an intermediate learner: build something real that stretches your skills.",
+    "advanced": "Challenge project for an advanced learner: real constraints, quality criteria and critical review.",
+}
+
+
+def build_source_brief(profile: dict, title: str, experience: str, level: str = "beginner") -> tuple[str, list[dict]]:
+    level = normalize(level)
     occupation = profile["occupation"]["title"]
-    tasks = profile["tasks"][:3]
+    tasks = profile["tasks"][: {"beginner": 1, "intermediate": 3, "advanced": 3}[level]]
     skills = [s["name"] for s in profile["skills"][:5]]
     tools = (profile["technology"]["in_demand"] or profile["technology"]["other"])[:3]
     lines = [
         title,
+        f"Level: {level.title()}. {LEVEL_SCOPE[level]}",
         f"Built from official O*NET task statements for {occupation} (not AI-generated).",
         "",
         "Goal: complete a small, realistic piece of work modelled on what this occupation actually does.",
         "",
         "Real tasks this project simulates:",
-        *[f"  • {task}" for task in tasks],
+        *[f"  ? {task}" for task in tasks],
         "",
         "Skills you will practise: " + (", ".join(skills) if skills else "see the career profile"),
     ]
@@ -50,11 +60,26 @@ def build_source_brief(profile: dict, title: str, experience: str) -> tuple[str,
     if experience:
         lines += ["", f"Your starting point: {experience}"]
     lines += ["", "Deliverable: a short write-up or artefact you can add to your portfolio."]
-    milestones = _milestones([f"Plan how you will approach: {tasks[0]}" if tasks else DEFAULT_MILESTONES[0],
-                              *[f"Complete: {task}" for task in tasks],
-                              "Write up what you did, what you learned, and the result",
-                              "Add the finished work to your portfolio"])
-    return "\n".join(lines), milestones
+    first = tasks[0] if tasks else DEFAULT_MILESTONES[0]
+    if level == "beginner":
+        titles = [
+            f"Read the task and explain it in your own words: {first}",
+            "List what you would need to do it (people, tools, information)",
+            "Follow a simple tutorial or example to try a small version",
+            "Write 3 sentences on what you learned and what was hard",
+            "Add the finished work to your portfolio",
+        ]
+    elif level == "intermediate":
+        titles = [f"Plan how you will approach: {first}", *[f"Complete: {task}" for task in tasks],
+                  "Write up what you did, what you learned, and the result",
+                  "Add the finished work to your portfolio"]
+    else:
+        titles = [f"Define success metrics and constraints (time, budget, quality) for: {first}",
+                  *[f"Deliver: {task}" for task in tasks],
+                  "Get a critical review from someone experienced and revise",
+                  "Document trade-offs, results and what you would improve",
+                  "Publish a case study in your portfolio"]
+    return "\n".join(lines), _milestones(titles)
 
 
 def serialize(project) -> dict:
@@ -74,7 +99,8 @@ def create_project(db: Session, user: User, request: ProjectRequest) -> dict:
         if occupation is None:
             raise NotFoundError("No imported occupation matches. Pick one in Career Explorer first.")
         title = request.title.strip() if request.title else f"{occupation.title} practice project"
-        description, milestones = build_source_brief(build_profile(db, occupation.id), title, request.experience)
+        description, milestones = build_source_brief(build_profile(db, occupation.id), title, request.experience,
+                                                   effective_level(db, user.id))
         records = [{"id": "S1", "source_type": "onet", "title": occupation.title,
                     "url": f"https://www.onetonline.org/link/summary/{occupation.onet_soc_code}",
                     "reference": "O*NET® Database, U.S. Department of Labor/ETA", "text": occupation.description or ""}]

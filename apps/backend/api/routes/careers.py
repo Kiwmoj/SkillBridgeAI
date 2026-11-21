@@ -2,7 +2,9 @@ from fastapi import APIRouter, Query
 
 from apps.backend.api.dependencies import CurrentUser, DbSession
 from apps.backend.schemas.careers import CareerCompareRequest, CustomOccupationRequest
-from apps.backend.services.careers import explorer
+from apps.backend.services import levels
+from apps.backend.services.careers import explorer, pathways
+from apps.backend.services.careers.profile import build_profile
 
 router = APIRouter(tags=["careers"])
 
@@ -14,6 +16,20 @@ def search_occupations(
     limit: int = Query(default=30, ge=1, le=100),
 ):
     return explorer.search(db, q, limit)
+
+
+@router.get("/occupations/recommended")
+def recommended_careers(user: CurrentUser, db: DbSession):
+    level = levels.effective_level(db, user.id)
+    return {"level": level, "careers": pathways.recommended(db, level)}
+
+
+@router.get("/occupations/{occupation_id}/profile")
+def occupation_profile(occupation_id: int, user: CurrentUser, db: DbSession):
+    level = levels.effective_level(db, user.id)
+    profile = build_profile(db, occupation_id)
+    return {**profile, "level": level, "pathways": pathways.pathways(profile),
+            "getting_started": pathways.getting_started(level)}
 
 
 @router.get("/occupations/saved")

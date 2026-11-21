@@ -27,4 +27,5 @@ class Profile(Base):
     interests: Mapped[str | None] = mapped_column(Text, nullable=True)
     goals: Mapped[str | None] = mapped_column(Text, nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    skill_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
     user = relationship("User", back_populates="profile")
