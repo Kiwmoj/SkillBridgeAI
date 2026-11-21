@@ -76,6 +76,7 @@ def analyze(db: Session, user_id: int, request: SkillGapRequest) -> dict:
     }[level]
     return {
         "occupation": occupation.title,
+        "source_url": f"https://www.onetonline.org/link/summary/{occupation.onet_soc_code}",
         "level": level,
         "focus": gaps[:count],
         "guidance": guidance,

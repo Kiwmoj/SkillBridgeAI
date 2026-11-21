@@ -376,7 +376,8 @@ async function showDetail(id, detail) {
       `<p>${esc(o.description || "")}</p>` +
       (rated.length ? `<h2 style="margin-top:16px">Most important abilities</h2><p class="muted tiny">O*NET importance rating, scale 1 to 5</p>${bars(rated.map((x) => [x.name, x.rating, 5]))}`
         : empty("No rated descriptors", "None were imported for this occupation.")) +
-      `<div class="muted tiny" style="margin-top:12px">${esc(d.attribution.credit)}</div>`;
+      `<p style="margin-top:14px"><a href="https://www.onetonline.org/link/summary/${esc(o.onet_soc_code)}" target="_blank" rel="noopener">View the full profile on O*NET OnLine ↗</a></p>` +
+      `<div class="muted tiny" style="margin-top:12px">${esc(d.attribution.credit)} · <a href="${esc(d.attribution.source_url)}" target="_blank" rel="noopener">O*NET database</a> · <a href="${esc(d.attribution.license_url)}" target="_blank" rel="noopener">CC BY 4.0 license</a></div>`;
     const save = labeled(el("button", { className: "small", textContent: "Save career", type: "button", style: "margin-top:14px" }));
     save.addEventListener("click", async () => {
       try { await api(`/occupations/saved/${id}`, { method: "PUT" }); toast("Career saved."); } catch (e) { toast(e.message); }
@@ -423,6 +424,7 @@ function viewSkillGap(view) {
       out.innerHTML =
         `<div class="row center" style="margin-top:18px"><h2 class="grow">${esc(r.occupation)}</h2><span class="badge">${esc(r.source)}</span><span class="badge">${esc(levelName())} view</span></div>` +
         (r.notice ? `<div class="notice">${esc(r.notice)}</div>` : "") +
+        (r.source_url ? `<p class="tiny"><a href="${esc(r.source_url)}" target="_blank" rel="noopener">Verify on O*NET OnLine ↗</a></p>` : "") +
         (r.guidance ? `<div class="level-banner" style="margin-top:14px"><b>Start here</b><div class="muted">${esc(r.guidance)}</div></div>${chips(r.focus || [], "gap", 12)}` : "") +
         `<h2 style="margin-top:16px">Strengths you already have</h2>${r.strengths.length ? chips(r.strengths, "good") : '<p class="muted">Nothing listed yet. That is fine, add skills above, or just follow the Start here list.</p>'}` +
         (rest.length ? `<details style="margin-top:16px"><summary class="muted">See all other skills for this career (${rest.length})</summary>${chips(rest, "gap", 40)}</details>` : "");
@@ -471,8 +473,10 @@ function viewRoadmaps(view) {
           ul.append(el("li", { className: a.status === "completed" ? "done" : "" }, cb, el("span", {}, a.title)));
         });
         card.append(ul);
+        const refs = (rm.sources || []).filter((s) => s.url).map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)} (O*NET OnLine) ↗</a>`);
+        if (refs.length) card.append(el("p", { className: "tiny muted", innerHTML: "Sources: " + refs.join(" · ") }));
         const meta = el("div", { className: "row center", style: "margin-top:12px" },
-          el("span", { className: "badge " + (rm.generated === false ? "warn" : "") , textContent: "Created " + fmtDate(rm.created_at) }));
+          el("span", { className: "badge " + (rm.generated === false ? "warn" : ""), textContent: "Created " + fmtDate(rm.created_at) }));
         const del = el("button", { className: "danger small", textContent: "Delete", type: "button" });
         del.addEventListener("click", async () => {
           if (!confirm("Delete this roadmap and its steps?")) return;
