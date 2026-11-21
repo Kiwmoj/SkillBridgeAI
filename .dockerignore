@@ -1,5 +1,6 @@
 .git
 .venv
+.venv-*
 .env
 .env.*
 **/__pycache__
@@ -7,5 +8,7 @@
 *.db*
 uploads
 data
-desktop
+docs
+apps/desktop
 tests
+scripts

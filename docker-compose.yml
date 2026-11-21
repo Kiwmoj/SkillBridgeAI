@@ -13,7 +13,9 @@ services:
       timeout: 5s
       retries: 5
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
     ports:
       - "127.0.0.1:8000:8000"
     environment:
