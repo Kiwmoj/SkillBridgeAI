@@ -7,3 +7,6 @@ uploads/
 .pytest_cache/
 dist/
 build/
+.venv-*/
+data/onet/raw/*
+!data/onet/raw/.gitkeep
