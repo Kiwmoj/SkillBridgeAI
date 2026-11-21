@@ -21,7 +21,10 @@ def add_action(layout: QBoxLayout, label: str, action: Callable[..., object]) ->
 class Card(QWidget):
     def __init__(self, title: str) -> None:
         super().__init__()
+        self.setObjectName("card")
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(6)
         heading = QLabel(title)
         heading.setObjectName("cardTitle")
         layout.addWidget(heading)

@@ -27,13 +27,15 @@ class LoginWindow(QWidget):
         self._main_window: MainWindow | None = None
         self._worker: ApiWorker | None = None
         self.setWindowTitle(settings.app_name)
-        self.resize(460, 360)
+        self.resize(480, 420)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(32, 28, 32, 28)
+        layout.setSpacing(12)
         layout.addWidget(
             QLabel(
-                "<h1>SkillBridge AI</h1>"
-                "<p>Career development for every occupation</p>"
+                "<h1 style='margin-bottom:2px'>SkillBridge AI</h1>"
+                "<p style='color:#9fb0d0'>Career development for every occupation</p>"
             )
         )
         self.name_input = QLineEdit()

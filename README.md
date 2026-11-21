@@ -140,7 +140,12 @@ Tests use a fresh migrated SQLite database per test and test doubles for AI call
 
 ## Deployment
 
-`docker compose up --build` runs PostgreSQL + the API locally. Railway builds [`infrastructure/docker/Dockerfile`](infrastructure/docker/Dockerfile) via [`railway.json`](railway.json); set `DATABASE_URL`, `APP_ENV=production`, `JWT_SECRET`, and a volume-backed `UPLOAD_DIR`, then verify `https://<domain>/health`. Full checklist: [docs/deployment/railway.md](docs/deployment/railway.md). No deployment has been performed from this repository.
+`docker compose up --build` runs PostgreSQL + the API locally. For the cloud, two one-click blueprints are included:
+
+- **Render** — [`render.yaml`](render.yaml) provisions the Docker web service, a managed PostgreSQL database, and an uploads disk. In Render: **New → Blueprint → this repo**. Guide: [docs/deployment/render.md](docs/deployment/render.md).
+- **Railway** — [`railway.json`](railway.json) builds [`infrastructure/docker/Dockerfile`](infrastructure/docker/Dockerfile). Guide: [docs/deployment/railway.md](docs/deployment/railway.md).
+
+For either, set `DATABASE_URL`, `APP_ENV=production`, `JWT_SECRET`, and a volume-backed `UPLOAD_DIR`, then verify `https://<domain>/health`. No deployment has been performed from this repository.
 
 ## API
 

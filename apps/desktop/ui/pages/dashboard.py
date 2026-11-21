@@ -16,10 +16,12 @@ class DashboardPage(Page):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("<h1>Dashboard</h1><p>Your career development workspace</p>"))
         cards = QHBoxLayout()
+        cards.setSpacing(14)
         self.values: dict[str, QLabel] = {}
         for card_title in CARD_TITLES:
             card = Card(card_title)
             value = QLabel("Loading...")
+            value.setObjectName("cardValue")
             card.body.addWidget(value)
             cards.addWidget(card)
             self.values[card_title] = value

@@ -3,6 +3,7 @@ from typing import Any
 
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
+    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -11,6 +12,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QProgressBar,
+    QScrollArea,
     QStackedWidget,
     QStatusBar,
     QVBoxLayout,
@@ -114,9 +116,23 @@ class MainWindow(QMainWindow):
             page = self.create_page(title, context, account)
             self.pages[title] = page
             self.nav.addItem(title)
-            self.stack.addWidget(page)
+            self.stack.addWidget(self.wrap_scrollable(page))
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav.setCurrentRow(0)
+
+    @staticmethod
+    def wrap_scrollable(page: Page) -> QScrollArea:
+        """Give every page uniform padding and a scroll bar so tall pages stay usable."""
+        inner = page.layout()
+        if inner is not None:
+            inner.setContentsMargins(24, 20, 24, 20)
+            inner.setSpacing(12)
+        scroll = QScrollArea()
+        scroll.setObjectName("pageScroll")
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        return scroll
 
     @staticmethod
     def create_page(title: str, context: PageContext, account: AccountActions | None) -> Page:
