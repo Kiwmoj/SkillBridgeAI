@@ -13,7 +13,8 @@ from sqlalchemy import delete, insert, select, update
 from sqlalchemy.orm import Session
 
 from apps.backend.models import (
-    AlternateTitle, DatasetVersion, Descriptor, Occupation, RelatedOccupation, TrainingHistory,
+    AlternateTitle, DatasetVersion, Descriptor, Occupation, OnetCategory, OnetElement, OnetJobZone,
+    RelatedOccupation, TrainingHistory,
 )
 from packages.onet.constants import ONET_URL
 from packages.onet.parser import (
@@ -29,6 +30,7 @@ from packages.onet.parser import (
 )
 
 BATCH_SIZE = 2000
+REFERENCE_FILES = {"contentmodelreference", "educationcategories", "jobzonereference"}
 
 
 class OnetImportError(RuntimeError):
@@ -39,13 +41,70 @@ def import_onet_zip(db: Session, path: str | BinaryIO, version: str, skip_files:
     """Replace the imported reference rows for this release, preserving occupation IDs."""
     try:
         with zipfile.ZipFile(path) as archive:
-            return _import_archive(db, OnetArchive(archive), version, skip_files)
+            parsed = OnetArchive(archive)
+            result = _import_archive(db, parsed, version, skip_files)
+            result["reference_rows"] = _import_references(db, parsed)
+            return result
     except OnetParseError as exc:
         raise OnetImportError(str(exc)) from exc
     except (zipfile.BadZipFile, UnicodeError, csv.Error, NotImplementedError, RuntimeError) as exc:
         if isinstance(exc, OnetImportError):
             raise
         raise OnetImportError("Unreadable O*NET ZIP. Use the official UTF-8 CSV or text ZIP.") from exc
+
+
+def import_onet_references(db: Session, path: str | BinaryIO) -> int:
+    """Load only the definitions/education/job-zone reference tables (for databases imported earlier)."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return _import_references(db, OnetArchive(archive))
+    except (OnetParseError, zipfile.BadZipFile, UnicodeError, csv.Error) as exc:
+        raise OnetImportError(f"Unreadable O*NET reference data: {exc}") from exc
+
+
+def _number(value: str | None) -> int | None:
+    try:
+        return int(float(value)) if value else None
+    except ValueError:
+        return None
+
+
+def _import_references(db: Session, archive: OnetArchive) -> int:
+    """Replace reference tables from the archive when present; returns the number of rows written."""
+    members = {member.key: member for member in archive.members if member.key in REFERENCE_FILES}
+    written = 0
+    if "contentmodelreference" in members:
+        rows = {}
+        for row in archive.rows(members["contentmodelreference"]):
+            element_id, name = row.get("Element ID", ""), row.get("Element Name", "")
+            if element_id and name:
+                rows[element_id] = {"element_id": element_id[:32], "name": name[:255], "description": row.get("Description")}
+        db.execute(delete(OnetElement))
+        _add_batch(db, OnetElement, list(rows.values()))
+        written += len(rows)
+    if "educationcategories" in members:
+        categories = {}
+        for row in archive.rows(members["educationcategories"]):
+            number = _number(row.get("Category"))
+            if row.get("Element ID") and row.get("Scale ID") and number is not None and row.get("Category Description"):
+                key = (row["Element ID"], row["Scale ID"], number)
+                categories[key] = {"element_id": key[0][:32], "scale_id": key[1][:8], "category": number,
+                                   "description": row["Category Description"][:255]}
+        db.execute(delete(OnetCategory))
+        _add_batch(db, OnetCategory, list(categories.values()))
+        written += len(categories)
+    if "jobzonereference" in members:
+        zones = {}
+        for row in archive.rows(members["jobzonereference"]):
+            zone = _number(row.get("Job Zone"))
+            if zone is not None and row.get("Name"):
+                zones[zone] = {"zone": zone, "name": row["Name"][:255], "experience": row.get("Experience"),
+                               "education": row.get("Education"), "training": row.get("Job Training"),
+                               "examples": row.get("Examples")}
+        db.execute(delete(OnetJobZone))
+        _add_batch(db, OnetJobZone, list(zones.values()))
+        written += len(zones)
+    return written
 
 
 def register_import(db: Session, result: dict) -> None:

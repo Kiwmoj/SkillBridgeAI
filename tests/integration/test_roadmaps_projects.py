@@ -22,6 +22,7 @@ from tests.fixtures.onet import make_onet_archive
 
 def test_roadmap_project_and_activity_persist(monkeypatch, client):
     token = register(client)["access_token"]
+    monkeypatch.setattr(ai_service, "status", lambda: {"provider": "gemini", "configured": True, "reachable": None})
     monkeypatch.setattr(
         ai_service,
         "generate",

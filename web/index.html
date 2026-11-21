@@ -3,56 +3,78 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#070b1f" />
+  <meta name="description" content="SkillBridge AI turns official O*NET occupational data into personalized career plans, skill gap analysis, and project ideas." />
   <title>SkillBridge AI</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <!-- Auth screen -->
-  <div id="auth" class="auth-wrap">
-    <div class="auth-card">
+  <!-- Landing + auth -->
+  <div id="auth" class="landing">
+    <header class="land-nav">
       <div class="brand-row">
         <div class="logo">SB</div>
-        <div>
-          <h1>SkillBridge AI</h1>
-          <p class="muted">Career development for every occupation</p>
+        <span class="brand-name">SkillBridge AI</span>
+      </div>
+      <span class="status-pill"><span id="api-dot" class="dot"></span><span id="api-status">Checking backend…</span></span>
+    </header>
+    <section class="hero">
+      <div>
+        <span class="eyebrow">CAREER INTELLIGENCE, GROUNDED IN REAL DATA</span>
+        <h1>Plan your career with <span class="grad-text">evidence</span>, not guesses.</h1>
+        <p class="lead">SkillBridge AI turns official U.S. Department of Labor O*NET data into career profiles, skill gap analysis, learning roadmaps, and project ideas, with the source shown every time.</p>
+        <div class="feature-grid">
+          <div class="feature"><b>Career Explorer</b><span class="muted tiny">Search official O*NET occupations and their skills.</span></div>
+          <div class="feature"><b>Skill Gap Analyzer</b><span class="muted tiny">Compare your skills with real requirements.</span></div>
+          <div class="feature"><b>Roadmaps &amp; Projects</b><span class="muted tiny">Step-by-step plans you can track.</span></div>
+          <div class="feature"><b>Opportunities</b><span class="muted tiny">Official directories for colleges and training.</span></div>
         </div>
       </div>
-      <div class="tabs">
-        <button class="tab active" data-tab="login">Sign in</button>
-        <button class="tab" data-tab="register">Create account</button>
+      <div class="auth-card">
+        <h2>Welcome</h2>
+        <p class="muted" style="margin:0">Sign in or create a free account to start.</p>
+        <div class="tabs">
+          <button class="tab active" data-tab="login" type="button">Sign in</button>
+          <button class="tab" data-tab="register" type="button">Create account</button>
+        </div>
+        <form id="auth-form" autocomplete="off">
+          <label id="name-field" class="hidden">Full name
+            <input id="f-name" type="text" placeholder="Jordan Lee" />
+          </label>
+          <label>Email
+            <input id="f-email" type="email" placeholder="you@example.com" required />
+          </label>
+          <label>Password
+            <input id="f-password" type="password" placeholder="At least 8 characters" required />
+          </label>
+          <button class="primary" id="auth-submit" type="submit">Sign in</button>
+          <p id="auth-error" class="error" role="alert"></p>
+        </form>
+        <p class="muted tiny auth-foot">Your data stays on the server you connect to.</p>
       </div>
-      <form id="auth-form" autocomplete="off">
-        <label id="name-field" class="hidden">Full name
-          <input id="f-name" type="text" placeholder="Jordan Lee" />
-        </label>
-        <label>Email
-          <input id="f-email" type="email" placeholder="you@example.com" required />
-        </label>
-        <label>Password
-          <input id="f-password" type="password" placeholder="At least 8 characters" required />
-        </label>
-        <button class="primary" id="auth-submit" type="submit">Sign in</button>
-        <p id="auth-error" class="error"></p>
-      </form>
-      <p class="muted tiny">Backend: <span id="api-status">checking…</span></p>
-    </div>
+    </section>
   </div>
 
   <!-- App shell -->
   <div id="app" class="shell hidden">
     <aside class="sidebar">
-      <div class="brand">SkillBridge AI</div>
-      <div class="brand-tag">CAREER PLATFORM</div>
-      <nav id="nav"></nav>
+      <div class="side-brand">
+        <div class="logo">SB</div>
+        <div><b>SkillBridge AI</b><small>CAREER PLATFORM</small></div>
+      </div>
+      <nav id="nav" aria-label="Main"></nav>
       <div class="sidebar-foot">
-        <div id="who" class="muted tiny"></div>
-        <button id="logout" class="ghost">Sign out</button>
+        <div class="avatar-row">
+          <div id="avatar" class="avatar">?</div>
+          <div class="who-text"><div id="who" class="who-name"></div><div id="who-role" class="muted tiny"></div></div>
+        </div>
+        <button id="logout" class="ghost small" type="button">Sign out</button>
       </div>
     </aside>
     <main id="view" class="content"></main>
   </div>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status"></div>
   <script src="/app.js"></script>
 </body>
 </html>

@@ -20,7 +20,8 @@ from apps.backend.models.occupations import (
     RelatedOccupation,
     SavedCareer,
 )
-from apps.backend.models.opportunities import Opportunity
+from apps.backend.models.learning import LessonProgress, OnetCategory, OnetElement, OnetJobZone
+from apps.backend.models.opportunities import OPPORTUNITY_CATEGORIES, Opportunity
 from apps.backend.models.portfolio import Portfolio
 from apps.backend.models.projects import Project
 from apps.backend.models.roadmaps import LearningActivity, Roadmap
@@ -31,7 +32,8 @@ from apps.backend.models.users import Profile, User
 __all__ = [
     "AIUsage", "AlternateTitle", "ApprovedKnowledge", "CONSENT_VERSION", "CommunityContribution",
     "CommunityPolicy", "CustomOccupation", "DatasetRecord", "DatasetVersion", "Descriptor",
-    "LearningActivity", "ModelVersion", "Occupation", "Opportunity", "Portfolio", "Profile", "Project",
+    "LearningActivity", "LessonProgress", "ModelVersion", "OPPORTUNITY_CATEGORIES", "Occupation", "OnetCategory",
+    "OnetElement", "OnetJobZone", "Opportunity", "Portfolio", "Profile", "Project",
     "RelatedOccupation", "ReviewHistory", "Roadmap", "SavedCareer", "SkillAssessment", "TrainingConsent",
     "TrainingHistory", "User",
 ]

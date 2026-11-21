@@ -5,6 +5,7 @@ from apps.backend.models import (
     AIUsage,
     CustomOccupation,
     LearningActivity,
+    LessonProgress,
     Opportunity,
     Portfolio,
     Profile,
@@ -16,8 +17,9 @@ from apps.backend.models import (
     User,
 )
 
-USER_OWNED_TABLES = (TrainingConsent, AIUsage, SkillAssessment, LearningActivity, Roadmap, Project,
-                     Portfolio, Opportunity, CustomOccupation, SavedCareer)
+# Order matters with foreign keys enforced: portfolio items reference projects, activities reference roadmaps.
+USER_OWNED_TABLES = (TrainingConsent, AIUsage, SkillAssessment, LessonProgress, LearningActivity, Roadmap, Portfolio,
+                     Project, Opportunity, CustomOccupation, SavedCareer)
 
 
 def get_by_email(db: Session, email: str) -> User | None:

@@ -32,7 +32,6 @@ from apps.desktop.ui.pages.opportunities import OpportunitiesPage
 from apps.desktop.ui.pages.portfolio import PortfolioPage
 from apps.desktop.ui.pages.profile import ProfilePage
 from apps.desktop.ui.pages.projects import ProjectsPage
-from apps.desktop.ui.pages.reality_check import RealityCheckPage
 from apps.desktop.ui.pages.roadmap import LearningRoadmapPage
 from apps.desktop.ui.pages.settings import AccountActions, SettingsPage
 from apps.desktop.ui.pages.skill_gap import SkillGapPage
@@ -44,7 +43,6 @@ PAGE_TYPES: dict[str, type[Page]] = {
         DashboardPage,
         ProfilePage,
         CareerExplorerPage,
-        RealityCheckPage,
         SkillGapPage,
         LearningRoadmapPage,
         PortfolioPage,

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from apps.backend.database.base import Base, utcnow
@@ -14,3 +14,6 @@ class Project(Base):
     description: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default="planned")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Checklist of {"title": str, "done": bool}; completing milestones drives in-platform progress.
+    milestones: Mapped[list[dict] | None] = mapped_column(JSON, default=list, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)

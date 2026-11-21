@@ -10,3 +10,5 @@ build/
 .venv-*/
 data/onet/raw/*
 !data/onet/raw/.gitkeep
+
+.public-pids

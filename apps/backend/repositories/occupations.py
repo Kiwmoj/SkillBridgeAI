@@ -1,4 +1,4 @@
-from sqlalchemy import delete, or_, select
+from sqlalchemy import case, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from apps.backend.models import AlternateTitle, CustomOccupation, Descriptor, Occupation, RelatedOccupation, SavedCareer
@@ -9,10 +9,26 @@ def _like_pattern(text: str) -> str:
     return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
+def _search_stem(text: str) -> str:
+    """Trim common word endings so 'nursing' also finds 'Nurses'."""
+    word = text.strip()
+    for suffix in ("ing", "ers", "er", "es", "s"):
+        if len(word) - len(suffix) >= 4 and word.lower().endswith(suffix):
+            return word[: -len(suffix)]
+    return word
+
+
 def search(db: Session, text: str, limit: int) -> list[Occupation]:
-    match = _like_pattern(text)
-    return (
-        db.query(Occupation)
+    match = _like_pattern(_search_stem(text))
+    rank = case(
+        (Occupation.title.ilike(match, escape="\\"), 0),
+        (AlternateTitle.title.ilike(match, escape="\\"), 1),
+        (Occupation.onet_soc_code.ilike(match, escape="\\"), 1),
+        else_=2,
+    )
+    best = func.min(rank)
+    ids = (
+        db.query(Occupation.id)
         .join(AlternateTitle, isouter=True)
         .filter(
             Occupation.dataset_version.is_not(None),
@@ -23,11 +39,17 @@ def search(db: Session, text: str, limit: int) -> list[Occupation]:
                 AlternateTitle.title.ilike(match, escape="\\"),
             ),
         )
-        .distinct()
-        .order_by(Occupation.title, Occupation.id)
+        .group_by(Occupation.id, Occupation.title)
+        .order_by(best, Occupation.title, Occupation.id)
         .limit(limit)
         .all()
     )
+    order = [row[0] for row in ids]
+    if not order:
+        return []
+    found = {item.id: item for item in db.query(Occupation).filter(Occupation.id.in_(order)).all()}
+    return [found[i] for i in order]
+
 
 
 def get_active(db: Session, occupation_id: int) -> Occupation | None:

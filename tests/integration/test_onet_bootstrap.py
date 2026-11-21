@@ -20,7 +20,9 @@ def test_auto_import_loads_empty_database_once_and_honours_skips(client, tmp_pat
     assert client.get(f"{API}/health").json()["onet_version"] == "user-supplied"
     assert client.get(f"{API}/occupations/search", params={"q": "Nurse"}).json()[0]["title"] == "Registered Nurses"
 
-    assert bootstrap.run_import() is None
+    # A second run never re-imports occupations (the tiny fixture has no reference tables to backfill).
+    second = bootstrap.run_import()
+    assert second is None or "occupations" not in second
 
 
 def test_auto_import_is_off_by_default(client):

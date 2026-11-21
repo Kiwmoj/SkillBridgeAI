@@ -16,12 +16,17 @@ MATCH_NOTICE = "Matches are self-reported. A gap means a descriptor was not repo
 
 def analyze(db: Session, user_id: int, request: SkillGapRequest) -> dict:
     occupation = None
+    matched_from = None
     if request.occupation_id:
         occupation = occupations_repository.get_active(db, request.occupation_id)
         if not occupation:
             raise NotFoundError("Occupation not found")
     elif request.occupation_title:
         occupation = occupations_repository.find_by_title_or_code(db, request.occupation_title)
+        if not occupation:
+            matches = occupations_repository.search(db, request.occupation_title, 1)
+            occupation = matches[0] if matches else None
+            matched_from = request.occupation_title if occupation else None
 
     if not occupation:
         custom = (
@@ -53,12 +58,17 @@ def analyze(db: Session, user_id: int, request: SkillGapRequest) -> dict:
             "scale": descriptor.scale,
             "category": descriptor.category,
         }
-        (strengths if descriptor.name.casefold() in current else gaps).append(item)
+        # A listed skill counts if it names the descriptor or mentions it in a longer phrase.
+        known = descriptor.name.casefold() in current or any(descriptor.name.casefold() in text for text in current)
+        (strengths if known else gaps).append(item)
+    notice = MATCH_NOTICE
+    if matched_from:
+        notice = f'"{matched_from}" is not an exact O*NET title; showing the closest match, {occupation.title}. {MATCH_NOTICE}'
     return {
         "occupation": occupation.title,
         "strengths": strengths,
         "gaps": gaps,
-        "notice": MATCH_NOTICE,
+        "notice": notice,
         "source": "Official O*NET descriptors" if unique else "No imported O*NET descriptors",
     }
 

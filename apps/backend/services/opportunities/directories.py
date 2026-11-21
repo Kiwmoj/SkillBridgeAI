@@ -32,7 +32,7 @@ def official_directories(query: str) -> list[dict]:
         {
             "title": f"Training directory: {query_text}",
             "organization": "CareerOneStop",
-            "url": f"https://www.careeronestop.org/Toolkit/Training/find-training.aspx?keyword={encoded}",
+            "url": "https://www.careeronestop.org/FindTraining/find-training.aspx",
             "details": "Find training resources. Eligibility and availability must be confirmed with providers.",
         },
         {

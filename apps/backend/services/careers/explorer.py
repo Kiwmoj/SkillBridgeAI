@@ -121,6 +121,19 @@ def list_custom_occupations(db: Session, user_id: int):
     return repository.list_custom_occupations(db, user_id)
 
 
+def resolve_occupation(db: Session, occupation_id: int | None, text: str | None) -> Occupation | None:
+    """Find an imported occupation by ID, exact title/code, or the best search match."""
+    if occupation_id:
+        return repository.get_active(db, occupation_id)
+    if not text or not text.strip():
+        return None
+    exact = repository.find_by_title_or_code(db, text.strip())
+    if exact:
+        return exact
+    matches = repository.search(db, text.strip(), 1)
+    return matches[0] if matches else None
+
+
 def delete_custom_occupation(db: Session, user_id: int, occupation_id: int) -> None:
     item = repository.get_custom_occupation(db, user_id, occupation_id)
     if not item:

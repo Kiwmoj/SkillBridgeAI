@@ -5,7 +5,6 @@ BASE_NAV_ITEMS: list[str] = [
     "Dashboard",
     "My Profile",
     "Career Explorer",
-    "Career Reality Check",
     "Skill Gap Analyzer",
     "Learning Roadmap",
     "Portfolio Reviewer",

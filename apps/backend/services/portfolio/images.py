@@ -1,4 +1,4 @@
-"""Private portfolio image storage and AI review."""
+"""Portfolio Builder: private image storage, metadata, organisation, and optional AI review."""
 import io
 from pathlib import Path
 from uuid import uuid4
@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from apps.backend.core.exceptions import BadRequest, NotFoundError, PayloadTooLarge
-from apps.backend.models import User
+from apps.backend.models import Project, User
 from apps.backend.repositories import portfolio as repository
 from apps.backend.services.ai.grounded import generate_from_image
 
@@ -61,15 +61,58 @@ def store_upload(db: Session, user: User, filename: str | None, content: bytes, 
 
 
 def list_items(db: Session, user_id: int) -> list[dict]:
-    return [
-        {
-            "id": item.id,
-            "filename": item.filename,
-            "evaluation": item.evaluation,
-            "created_at": item.created_at.isoformat(),
-        }
-        for item in repository.list_items(db, user_id)
-    ]
+    return [serialize(item) for item in repository.list_items(db, user_id)]
+
+
+def serialize(item) -> dict:
+    return {
+        "id": item.id,
+        "filename": item.filename,
+        "title": item.title or Path(item.filename).stem,
+        "description": item.description,
+        "tags": [tag.strip() for tag in (item.tags or "").split(",") if tag.strip()],
+        "project_id": item.project_id,
+        "featured": bool(item.featured),
+        "evaluation": item.evaluation,
+        "created_at": item.created_at.isoformat(),
+        "image_url": f"/api/v1/portfolio/{item.id}/image",
+    }
+
+
+def update_details(db: Session, user_id: int, portfolio_id: int, fields: dict) -> dict:
+    item = repository.get_item(db, user_id, portfolio_id)
+    if not item:
+        raise NotFoundError("Portfolio item not found")
+    project_id = fields.get("project_id")
+    if project_id is not None and not db.query(Project).filter_by(id=project_id, user_id=user_id).first():
+        raise NotFoundError("Project not found")
+    if "tags" in fields and fields["tags"] is not None:
+        fields["tags"] = ", ".join(tag.strip() for tag in fields["tags"] if tag.strip())[:255]
+    for key, value in fields.items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return serialize(item)
+
+
+def image_path(db: Session, user_id: int, portfolio_id: int, upload_dir: Path) -> Path:
+    item = repository.get_item(db, user_id, portfolio_id)
+    if not item:
+        raise NotFoundError("Portfolio item not found")
+    path = upload_dir / Path(item.stored_path).name
+    if not path.is_file():
+        raise NotFoundError("Stored portfolio image is unavailable")
+    return path
+
+
+def delete_item(db: Session, user_id: int, portfolio_id: int, upload_dir: Path) -> None:
+    item = repository.get_item(db, user_id, portfolio_id)
+    if not item:
+        raise NotFoundError("Portfolio item not found")
+    stored = upload_dir / Path(item.stored_path).name
+    db.delete(item)
+    db.commit()
+    stored.unlink(missing_ok=True)
 
 
 def review(db: Session, user: User, portfolio_id: int, upload_dir: Path) -> dict:

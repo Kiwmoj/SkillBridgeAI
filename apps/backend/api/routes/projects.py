@@ -19,7 +19,7 @@ def list_projects(user: CurrentUser, db: DbSession):
 
 @router.patch("/{project_id}")
 def update_project(project_id: int, request: ProjectUpdateRequest, user: CurrentUser, db: DbSession):
-    return generation.update_status(db, user.id, project_id, request.status)
+    return generation.update_project(db, user.id, project_id, request)
 
 
 @router.delete("/{project_id}")
