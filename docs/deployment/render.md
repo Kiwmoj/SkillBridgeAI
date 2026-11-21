@@ -17,11 +17,24 @@ web service plus a managed PostgreSQL database and a persistent disk for uploads
 
 - Open `https://<service>.onrender.com/health` → `"database": "healthy"`, `"environment": "production"`,
   `"jwt_secret_configured": true`.
-- Create an administrator from the service **Shell**:
-  `python -m apps.backend.cli.create_admin --email you@example.com`
-- Load O*NET data from the Shell after uploading the CSV ZIP to the container:
-  `python -m apps.backend.cli.load_onet db_31_0_csv.zip`
-- Point the desktop **Backend address** at the HTTPS URL (HTTPS is required for non-loopback hosts).
+- Point the desktop **Backend address** at the HTTPS URL (HTTPS is required for non-loopback hosts) and
+  use **Create account** to make a student account.
+
+## Seed the admin and O*NET data (free plan has no Shell)
+
+Render's free web service has no Shell/Job, so run the one-time setup from your own machine against the
+database's **External Database URL** (Render → the `skillbridge-db` database → *Connections* → External):
+
+```powershell
+$env:DATABASE_URL = "<external database url from Render>"
+.\.venv\Scripts\python.exe -m apps.backend.cli.create_admin --email you@example.com
+.\.venv\Scripts\python.exe -m apps.backend.cli.load_onet data\onet\raw\db_31_0_csv.zip
+Remove-Item Env:\DATABASE_URL
+```
+
+The CLIs use the same configuration as the server, so this writes straight into the hosted database.
+(`psycopg` is already installed from `requirements.txt`.) On a paid instance you can instead open the
+service **Shell** and run the same two commands there.
 
 ## Notes and limits
 
