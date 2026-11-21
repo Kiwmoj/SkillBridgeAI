@@ -242,15 +242,18 @@ function viewReality(view) {
   btn.addEventListener("click", async () => {
     if (!q.value.trim()) { toast("Enter a question first."); return; }
     out.classList.remove("hidden");
-    out.innerHTML = 'Generating… <span class="spinner"></span>';
+  out.innerHTML = 'Working… <span class="spinner"></span>';
     btn.disabled = true;
     try {
       const r = await api("/ai/generate", { method: "POST", body: { purpose: "Career Reality Check", question: q.value.trim() } });
-      const sources = (r.sources || []).map((s) => `[${s.id}] ${s.title} (${s.source_type})`).join("\n");
-      out.textContent = `AI-generated guidance\n\n${r.answer}\n\nRetrieved references:\n${sources || "None"}`;
+    const header = r.generated ? "AI-generated guidance" : "Compiled from official sources (not AI-generated)";
+    const sources = (r.sources || []).map((s) => {
+      const ref = [s.reference, s.url, s.text].filter(Boolean).join("\n");
+      return `[${s.id}] ${s.title} (${s.source_type})\n${ref}`;
+    }).join("\n\n");
+    out.textContent = `${header}\n\n${r.answer}\n\nRetrieved references:\n${sources || "None"}`;
     } catch (e) {
-      out.textContent = "This request could not be completed.\n\n" + e.message +
-        "\n\n(If this mentions GEMINI, an administrator needs to set GEMINI_API_KEY and GEMINI_MODEL on the backend.)";
+    out.textContent = "This request could not be completed.\n\n" + e.message;
     } finally { btn.disabled = false; }
   });
 }

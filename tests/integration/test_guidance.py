@@ -21,7 +21,9 @@ from tests.fixtures.api import API, admin_token, auth, register
 from tests.fixtures.onet import make_onet_archive
 
 def test_ai_outage_is_reported_without_fake_response(monkeypatch, client):
+    """A configured provider that fails must return 503, never a fabricated answer."""
     token = register(client)["access_token"]
+    monkeypatch.setattr(ai_service, "status", lambda: {"provider": "gemini", "configured": True, "reachable": None})
 
     def unavailable(prompt):
         raise AIProviderError("Gemini is unavailable")
@@ -36,3 +38,23 @@ def test_ai_outage_is_reported_without_fake_response(monkeypatch, client):
     )
     assert response.status_code == 503
     assert "unavailable" in response.json()["detail"].lower()
+
+
+def test_guidance_falls_back_to_sources_without_a_key(client, tmp_path):
+    """With no provider configured, guidance returns real source-based info, clearly not AI-generated."""
+    token = register(client)["access_token"]
+    archive, _ = make_onet_archive(tmp_path)
+    admin = auth(admin_token(client))
+    with archive.open("rb") as stream:
+        assert client.post(f"{API}/admin/onet/import?version=29.0", headers=admin,
+                           files={"file": ("onet.zip", stream)}).is_success
+
+    response = client.post(f"{API}/ai/generate", headers=auth(token),
+                           json={"purpose": "Career Reality Check", "question": "Registered Nurses"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["generated"] is False
+    assert body["provider"] == "sources"
+    assert "not AI-generated" in body["answer"]
+    assert body["sources"]  # retrieved official O*NET sources are attached
+

@@ -46,6 +46,7 @@ def test_contribution_moderation_consent_dataset_and_retrieval(monkeypatch, clie
     contribution_id = contribution.json()["id"]
 
     prompts = []
+    monkeypatch.setattr(ai_service, "status", lambda: {"provider": "gemini", "configured": True, "reachable": None})
     monkeypatch.setattr(ai_service, "generate", lambda prompt: prompts.append(prompt) or "General guidance.")
     question = {"purpose": "Learning recommendations", "question": "nursing study communication"}
     pending_rag = client.post(f"{API}/ai/generate", headers=auth(student_token), json=question)

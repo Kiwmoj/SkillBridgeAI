@@ -34,6 +34,7 @@ class RealityCheckPage(Page):
             return
         self.run(
             lambda: self.backend.generate_guidance(self.purpose, question),
-            lambda result: self.output.setPlainText(generated_text(result["answer"], result["sources"])),
+            lambda result: self.output.setPlainText(
+                generated_text(result["answer"], result["sources"], result.get("generated", True))),
             self.show_in(self.output),
         )
