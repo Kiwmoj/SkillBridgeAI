@@ -140,14 +140,20 @@ Tests use a fresh migrated SQLite database per test and test doubles for AI call
 
 ## Deployment
 
-The FastAPI backend also **serves a web frontend** (a single-page app in [`web/`](web)) at its root `/`, so one deployment gives you both the API and a browser UI at the same URL — this is what you host on Render. The PyQt6 desktop app remains available as a native client for local use.
+The FastAPI backend also **serves a web frontend** (a single-page app in [`web/`](web)) at its root `/`, so one server gives you both the API and a browser UI at the same URL. The PyQt6 desktop app remains available as a native client for local use.
 
-`docker compose up --build` runs PostgreSQL + the API (with the web UI at `http://127.0.0.1:8000/`) locally. For the cloud, two one-click blueprints are included:
+### Public demo with ngrok (Windows)
 
-- **Render** — [`render.yaml`](render.yaml) provisions the Docker web service (serving the web UI + API) and a managed PostgreSQL database. In Render: **New → Blueprint → this repo**. Guide: [docs/deployment/render.md](docs/deployment/render.md).
-- **Railway** — [`railway.json`](railway.json) builds [`infrastructure/docker/Dockerfile`](infrastructure/docker/Dockerfile). Guide: [docs/deployment/railway.md](docs/deployment/railway.md).
+This project is hosted from your own machine and exposed with [ngrok](https://ngrok.com). One-time setup: `winget install Ngrok.Ngrok`, run `ngrok update`, then `ngrok config add-authtoken <your token>` (the token is stored outside the repo).
 
-For either, set `DATABASE_URL`, `APP_ENV=production`, `JWT_SECRET`, and a volume-backed `UPLOAD_DIR`, then verify `https://<domain>/health` and open `https://<domain>/` for the UI. No deployment has been performed from this repository.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start_public.ps1   # starts the server on 8012 + ngrok, prints the public URL
+powershell -ExecutionPolicy Bypass -File .\scripts\stop_public.ps1    # stops the tunnel
+```
+
+The website calls the API with relative `/api/v1` URLs, so no CORS or URL configuration is needed. Free ngrok shows a one-time "Visit Site" warning page. Set `JWT_SECRET` in a local `.env` so logins survive restarts.
+
+`docker compose up --build` runs PostgreSQL + the API (with the web UI at `http://127.0.0.1:8000/`) locally. [`railway.json`](railway.json) builds [`infrastructure/docker/Dockerfile`](infrastructure/docker/Dockerfile) if you ever need cloud hosting ([docs/deployment/railway.md](docs/deployment/railway.md)); set `DATABASE_URL`, `APP_ENV=production`, `JWT_SECRET`, and a volume-backed `UPLOAD_DIR`. No cloud deployment is configured from this repository.
 
 ## API
 
