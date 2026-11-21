@@ -259,28 +259,77 @@ function viewReality(view) {
 }
 
 // ---------- Opportunities ----------
+const APP_STATUSES = ["saved", "preparing", "applied", "closed"];
 function viewOpportunities(view) {
   view.append(head("Opportunities & Colleges", "Official directories — verify details at the source"));
   const panel = el("div", { className: "panel" });
-  const input = el("input", { placeholder: "Career, college, or training topic" });
+  const input = el("input", { placeholder: "Career, college, or training topic (e.g. nursing)" });
   const btn = el("button", { textContent: "Find" });
   panel.append(el("div", { className: "row" }, el("div", { className: "grow" }, input), btn));
   const results = el("div", {});
   panel.append(results);
   view.append(panel);
-  btn.addEventListener("click", async () => {
+
+  const savedPanel = el("div", { className: "panel" });
+  savedPanel.append(el("h2", {}, "Saved opportunities"));
+  const savedList = el("div", {});
+  savedPanel.append(savedList);
+  view.append(savedPanel);
+
+  async function loadSaved() {
+    try {
+      const items = await api("/opportunities/saved");
+      savedList.innerHTML = items.length ? "" : '<p class="muted">Nothing saved yet. Search above and click Save.</p>';
+      items.forEach((it) => {
+        const row = el("div", { className: "list-item" });
+        row.innerHTML = `<h3>${esc(it.title)}</h3><div class="muted tiny">${esc(it.organization || "")}</div>`;
+        const select = el("select");
+        APP_STATUSES.forEach((s) => select.append(el("option", { value: s, selected: s === it.application_status }, s)));
+        select.addEventListener("change", async () => {
+          try { await api(`/opportunities/saved/${it.id}`, { method: "PATCH", body: { application_status: select.value } }); toast("Status updated."); }
+          catch (e) { toast(e.message); }
+        });
+        const open = el("a", { href: it.url || "#", target: "_blank", rel: "noopener", textContent: "Open ↗" });
+        const del = el("button", { className: "ghost small", textContent: "Remove" });
+        del.addEventListener("click", async () => {
+          try { await api(`/opportunities/saved/${it.id}`, { method: "DELETE" }); loadSaved(); } catch (e) { toast(e.message); }
+        });
+        const controls = el("div", { className: "row", style: "margin-top:10px;align-items:center" },
+          el("span", { className: "muted tiny" }, "Status:"), select, open, del);
+        row.append(controls);
+        savedList.append(row);
+      });
+    } catch (e) { savedList.innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+  }
+
+  async function find() {
+    const q = input.value.trim();
+    if (!q) { results.innerHTML = '<p class="muted">Enter a career, college, or training topic first.</p>'; return; }
     results.innerHTML = '<p class="muted">Searching… <span class="spinner"></span></p>';
     try {
-      const items = await api(`/opportunities?q=${encodeURIComponent(input.value.trim())}`, { auth: false });
+      const items = await api(`/opportunities?q=${encodeURIComponent(q)}`, { auth: false });
       results.innerHTML = "";
       items.forEach((it) => {
         const row = el("div", { className: "list-item" });
         row.innerHTML = `<h3>${esc(it.title)}</h3><div class="muted tiny">${esc(it.organization)}</div><p>${esc(it.details)}</p>`;
-        row.append(el("a", { href: it.url, target: "_blank", rel: "noopener", textContent: "Open source ↗" }));
+        const open = el("a", { href: it.url, target: "_blank", rel: "noopener", textContent: "Open source ↗" });
+        const save = el("button", { className: "small", textContent: "Save" });
+        save.addEventListener("click", async () => {
+          try {
+            await api("/opportunities/save", { method: "POST", body: {
+              title: it.title, organization: it.organization, url: it.url, details: it.details } });
+            toast("Saved.");
+            loadSaved();
+          } catch (e) { toast(e.message); }
+        });
+        row.append(el("div", { className: "row", style: "margin-top:10px;align-items:center" }, open, save));
         results.append(row);
       });
     } catch (e) { results.innerHTML = `<p class="error">${esc(e.message)}</p>`; }
-  });
+  }
+  btn.addEventListener("click", find);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") find(); });
+  loadSaved();
 }
 
 // ---------- Settings ----------

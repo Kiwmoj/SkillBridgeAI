@@ -26,7 +26,7 @@ def official_directories(query: str) -> list[dict]:
         {
             "title": "College and program search directory",
             "organization": "U.S. Department of Education / College Scorecard",
-            "url": "https://collegescorecard.ed.gov/search/",
+            "url": f"https://collegescorecard.ed.gov/search/?search={encoded}",
             "details": "Compare education options and costs. This is not a live event or admission listing.",
         },
         {
