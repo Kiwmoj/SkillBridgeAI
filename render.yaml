@@ -28,6 +28,12 @@ services:
         value: INFO
       - key: PYTHONUNBUFFERED
         value: "1"
+      # Load the official O*NET release automatically when the database has none (runs once).
+      # The three largest tables are skipped to stay well inside the free 1 GB database.
+      - key: ONET_AUTO_IMPORT
+        value: "true"
+      - key: ONET_SKIP_FILES
+        value: workcontext,taskratings,specificinterestareas
       # Set these in the Render dashboard to enable AI features (left unset by default).
       - key: GEMINI_API_KEY
         sync: false

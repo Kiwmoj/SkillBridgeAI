@@ -35,11 +35,11 @@ class OnetImportError(RuntimeError):
     pass
 
 
-def import_onet_zip(db: Session, path: str | BinaryIO, version: str) -> dict:
+def import_onet_zip(db: Session, path: str | BinaryIO, version: str, skip_files: frozenset[str] = frozenset()) -> dict:
     """Replace the imported reference rows for this release, preserving occupation IDs."""
     try:
         with zipfile.ZipFile(path) as archive:
-            return _import_archive(db, OnetArchive(archive), version)
+            return _import_archive(db, OnetArchive(archive), version, skip_files)
     except OnetParseError as exc:
         raise OnetImportError(str(exc)) from exc
     except (zipfile.BadZipFile, UnicodeError, csv.Error, NotImplementedError, RuntimeError) as exc:
@@ -71,7 +71,7 @@ def _add_batch(db: Session, table, batch: list[dict]) -> None:
         batch.clear()
 
 
-def _import_archive(db: Session, archive: OnetArchive, version: str) -> dict:
+def _import_archive(db: Session, archive: OnetArchive, version: str, skip_files: frozenset[str] = frozenset()) -> dict:
     version = archive.resolve_version(version)
     saved = {item.onet_soc_code: item for item in db.scalars(select(Occupation))}
     loaded: dict[str, Occupation] = {}
@@ -101,7 +101,7 @@ def _import_archive(db: Session, archive: OnetArchive, version: str) -> dict:
     related: set[tuple[int, str]] = set()
     for member in archive.members:
         kind = member.kind
-        if kind is None:
+        if kind is None or member.key in skip_files:
             continue
         table = AlternateTitle if kind == "titles" else RelatedOccupation if kind == "related" else Descriptor
         batch: list[dict] = []

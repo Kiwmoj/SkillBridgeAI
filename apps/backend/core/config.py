@@ -95,6 +95,9 @@ class Settings:
     port: int
     public_url: str | None
     log_level: str
+    onet_auto_import: bool = False
+    onet_archive_url: str = "https://www.onetcenter.org/dl_files/database/db_31_0_csv.zip"
+    onet_skip_files: frozenset[str] = frozenset()
 
     @property
     def production(self) -> bool:
@@ -147,6 +150,12 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         port=_integer(env, "PORT", 8000, 1, 65535),
         public_url=validate_public_url(env.get("BACKEND_URL", ""), production),
         log_level=log_level,
+        onet_auto_import=env.get("ONET_AUTO_IMPORT", "").strip().lower() in {"1", "true", "yes"},
+        onet_archive_url=env.get("ONET_ARCHIVE_URL", "").strip()
+        or "https://www.onetcenter.org/dl_files/database/db_31_0_csv.zip",
+        onet_skip_files=frozenset(
+            item.strip().lower() for item in env.get("ONET_SKIP_FILES", "").split(",") if item.strip()
+        ),
     )
 
 

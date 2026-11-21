@@ -42,6 +42,10 @@ async def lifespan(app: FastAPI):
     if not settings.jwt_secret_configured:
         logger.warning("JWT_SECRET is not configured; sessions will expire when this process stops.")
     logger.info("Startup checks passed.")
+    from apps.backend.services.careers.bootstrap import start_background_import
+
+    if start_background_import():
+        logger.info("O*NET auto-import started in the background.")
     yield
     connection.engine.dispose()
     logger.info("Shutdown complete.")

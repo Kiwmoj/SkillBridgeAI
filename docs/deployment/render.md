@@ -23,7 +23,14 @@ web service plus a managed PostgreSQL database and a persistent disk for uploads
 
 ## Seed the admin and O*NET data (free plan has no Shell)
 
-Render's free web service has no Shell/Job, so run the one-time setup from your own machine against the
+**O*NET data loads automatically.** `render.yaml` sets `ONET_AUTO_IMPORT=true`: when the service starts
+and the database has no O*NET release, it downloads the official 31.0 CSV archive and imports it in a
+background thread (~1–2 minutes, ~230 MB peak memory, ~240 MB of data). The three largest tables
+(Work Context, Task Ratings, Specific Interest Areas) are skipped via `ONET_SKIP_FILES` to stay well
+inside the free 1 GB database. Watch for `O*NET auto-import complete` in the service logs, then
+`/health` reports `"onet_version": "31.0"`. It never runs again once a release is loaded.
+
+To create an administrator (or load data manually), run the CLIs from your own machine against the
 database's **External Database URL** (Render → the `skillbridge-db` database → *Connections* → External):
 
 ```powershell
