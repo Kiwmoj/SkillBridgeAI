@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkillBridge AI</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Auth screen -->
+  <div id="auth" class="auth-wrap">
+    <div class="auth-card">
+      <div class="brand-row">
+        <div class="logo">SB</div>
+        <div>
+          <h1>SkillBridge AI</h1>
+          <p class="muted">Career development for every occupation</p>
+        </div>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Sign in</button>
+        <button class="tab" data-tab="register">Create account</button>
+      </div>
+      <form id="auth-form" autocomplete="off">
+        <label id="name-field" class="hidden">Full name
+          <input id="f-name" type="text" placeholder="Jordan Lee" />
+        </label>
+        <label>Email
+          <input id="f-email" type="email" placeholder="you@example.com" required />
+        </label>
+        <label>Password
+          <input id="f-password" type="password" placeholder="At least 8 characters" required />
+        </label>
+        <button class="primary" id="auth-submit" type="submit">Sign in</button>
+        <p id="auth-error" class="error"></p>
+      </form>
+      <p class="muted tiny">Backend: <span id="api-status">checking…</span></p>
+    </div>
+  </div>
+
+  <!-- App shell -->
+  <div id="app" class="shell hidden">
+    <aside class="sidebar">
+      <div class="brand">SkillBridge AI</div>
+      <div class="brand-tag">CAREER PLATFORM</div>
+      <nav id="nav"></nav>
+      <div class="sidebar-foot">
+        <div id="who" class="muted tiny"></div>
+        <button id="logout" class="ghost">Sign out</button>
+      </div>
+    </aside>
+    <main id="view" class="content"></main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

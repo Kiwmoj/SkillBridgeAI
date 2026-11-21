@@ -5,6 +5,7 @@ RUN pip install --no-cache-dir -r requirements-backend.txt
 COPY apps/__init__.py apps/__init__.py
 COPY apps/backend apps/backend
 COPY packages packages
+COPY web web
 COPY alembic.ini .
 RUN useradd --system --create-home skillbridge \
     && mkdir /app/uploads \

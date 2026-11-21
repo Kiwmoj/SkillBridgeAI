@@ -4,9 +4,11 @@ Routers are mounted twice: under ``/api/v1`` (canonical, documented) and at the 
 unprefixed paths (hidden from the schema) so existing clients keep working.
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -19,6 +21,9 @@ from apps.backend.database import connection
 
 configure_logging(settings.log_level)
 logger = get_logger(__name__)
+
+# The web frontend (served at "/") lives at the repository root.
+WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 
 
 @asynccontextmanager
@@ -55,6 +60,9 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(api_router, prefix=API_PREFIX)
     app.include_router(api_router, include_in_schema=False, deprecated=True)
+    # Serve the single-page web frontend at "/" when it is present (API routes above take priority).
+    if WEB_DIR.is_dir():
+        app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
     return app
 
 

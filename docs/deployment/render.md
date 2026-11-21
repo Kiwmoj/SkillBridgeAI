@@ -15,10 +15,11 @@ web service plus a managed PostgreSQL database and a persistent disk for uploads
 
 ## Verify
 
+- Open `https://<service>.onrender.com/` → the **web app** loads (sign-in screen with live backend status).
 - Open `https://<service>.onrender.com/health` → `"database": "healthy"`, `"environment": "production"`,
   `"jwt_secret_configured": true`.
 - Point the desktop **Backend address** at the HTTPS URL (HTTPS is required for non-loopback hosts) and
-  use **Create account** to make a student account.
+  use **Create account** to make a student account — or just use the hosted web app directly.
 
 ## Seed the admin and O*NET data (free plan has no Shell)
 

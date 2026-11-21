@@ -140,12 +140,14 @@ Tests use a fresh migrated SQLite database per test and test doubles for AI call
 
 ## Deployment
 
-`docker compose up --build` runs PostgreSQL + the API locally. For the cloud, two one-click blueprints are included:
+The FastAPI backend also **serves a web frontend** (a single-page app in [`web/`](web)) at its root `/`, so one deployment gives you both the API and a browser UI at the same URL — this is what you host on Render. The PyQt6 desktop app remains available as a native client for local use.
 
-- **Render** — [`render.yaml`](render.yaml) provisions the Docker web service, a managed PostgreSQL database, and an uploads disk. In Render: **New → Blueprint → this repo**. Guide: [docs/deployment/render.md](docs/deployment/render.md).
+`docker compose up --build` runs PostgreSQL + the API (with the web UI at `http://127.0.0.1:8000/`) locally. For the cloud, two one-click blueprints are included:
+
+- **Render** — [`render.yaml`](render.yaml) provisions the Docker web service (serving the web UI + API) and a managed PostgreSQL database. In Render: **New → Blueprint → this repo**. Guide: [docs/deployment/render.md](docs/deployment/render.md).
 - **Railway** — [`railway.json`](railway.json) builds [`infrastructure/docker/Dockerfile`](infrastructure/docker/Dockerfile). Guide: [docs/deployment/railway.md](docs/deployment/railway.md).
 
-For either, set `DATABASE_URL`, `APP_ENV=production`, `JWT_SECRET`, and a volume-backed `UPLOAD_DIR`, then verify `https://<domain>/health`. No deployment has been performed from this repository.
+For either, set `DATABASE_URL`, `APP_ENV=production`, `JWT_SECRET`, and a volume-backed `UPLOAD_DIR`, then verify `https://<domain>/health` and open `https://<domain>/` for the UI. No deployment has been performed from this repository.
 
 ## API
 
