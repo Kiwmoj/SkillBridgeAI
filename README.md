@@ -153,7 +153,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\stop_public.ps1    # stops th
 
 The website calls the API with relative `/api/v1` URLs, so no CORS or URL configuration is needed. Free ngrok shows a one-time "Visit Site" warning page. Set `JWT_SECRET` in a local `.env` so logins survive restarts.
 
-`docker compose up --build` runs PostgreSQL + the API (with the web UI at `http://127.0.0.1:8000/`) locally. [`railway.json`](railway.json) builds [`infrastructure/docker/Dockerfile`](infrastructure/docker/Dockerfile) if you ever need cloud hosting ([docs/deployment/railway.md](docs/deployment/railway.md)); set `DATABASE_URL`, `APP_ENV=production`, `JWT_SECRET`, and a volume-backed `UPLOAD_DIR`. No cloud deployment is configured from this repository.
+`docker compose up --build` runs PostgreSQL + the API (with the web UI at `http://127.0.0.1:8000/`) locally.
+
+### Render (cloud hosting)
+
+[`render.yaml`](render.yaml) provisions the Docker web service (serving the web UI + API) and a managed PostgreSQL database. In Render: **New → Blueprint → this repo** (or push to `main` to auto-deploy an existing service). The container runs `alembic upgrade head` on start, and `ONET_AUTO_IMPORT` loads O*NET data into an empty database. Guide: [docs/deployment/render.md](docs/deployment/render.md). Verify `https://<domain>/api/v1/health` shows `onet_version` "31.0".
+
+Alternatively, [`railway.json`](railway.json) builds the same [Dockerfile](infrastructure/docker/Dockerfile) ([docs/deployment/railway.md](docs/deployment/railway.md)).
 
 ## API
 

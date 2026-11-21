@@ -1,0 +1,47 @@
+# Render Blueprint — deploys the SkillBridge AI backend and a managed PostgreSQL database.
+# In Render: New → Blueprint → connect this GitHub repo. Render reads this file automatically.
+# The desktop app is a local Windows client; only the backend is hosted.
+services:
+  - type: web
+    name: skillbridge-api
+    runtime: docker
+    repo: https://github.com/Kiwmoj/SkillBridgeAI
+    dockerfilePath: ./infrastructure/docker/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skillbridge-db
+          property: connectionString
+      # Free web services cannot mount a persistent disk, so uploads live in the container
+      # filesystem and are cleared on restart/redeploy. Add a paid disk for durable uploads.
+      - key: UPLOAD_DIR
+        value: /app/uploads
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Load the official O*NET release automatically when the database has none (runs once).
+      # The three largest tables are skipped to stay well inside the free 1 GB database.
+      - key: ONET_AUTO_IMPORT
+        value: "true"
+      - key: ONET_SKIP_FILES
+        value: workcontext,taskratings,specificinterestareas
+      # Set these in the Render dashboard to enable AI features (left unset by default).
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+
+databases:
+  - name: skillbridge-db
+    plan: free
+    databaseName: skillbridge
+    user: skillbridge
