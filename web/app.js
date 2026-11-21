@@ -106,19 +106,39 @@ async function enterApp() {
 
 // ---------- navigation ----------
 const PAGES = ["Dashboard", "Career Explorer", "Skill Gap", "Career Reality Check", "Opportunities", "Settings"];
+const PAGE_ICONS = {
+  "Dashboard": "▦",
+  "Career Explorer": "⌕",
+  "Skill Gap": "↗",
+  "Career Reality Check": "✦",
+  "Opportunities": "◎",
+  "Settings": "⚙",
+};
+const PAGE_SHORT = {
+  "Dashboard": "Home",
+  "Career Explorer": "Careers",
+  "Skill Gap": "Skills",
+  "Career Reality Check": "Reality",
+  "Opportunities": "Options",
+  "Settings": "Settings",
+};
 let current = "Dashboard";
 function buildNav() {
   const nav = $("#nav");
   nav.innerHTML = "";
   PAGES.forEach((p) => {
-    const b = el("button", { className: "nav-item", textContent: p });
+    const icon = el("span", { className: "nav-icon", textContent: PAGE_ICONS[p] });
+    const label = el("span", { className: "nav-label", textContent: p });
+    const short = el("span", { className: "nav-short", textContent: PAGE_SHORT[p] });
+    const b = el("button", { className: "nav-item", title: p, textContent: "" }, icon, label, short);
+    b.setAttribute("aria-label", p);
     b.addEventListener("click", () => go(p));
     nav.append(b);
   });
 }
 function go(page) {
   current = page;
-  document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.textContent === page));
+  document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.getAttribute("aria-label") === page));
   const view = $("#view");
   view.innerHTML = "";
   ({
@@ -146,6 +166,19 @@ async function viewDashboard(view) {
     ["Saved opportunities", "saved_opportunities"],
   ];
   defs.forEach(([k]) => cards.append(el("div", { className: "card", innerHTML: `<div class="k">${k}</div><div class="v">—</div>` })));
+  const tour = el("section", { className: "panel tour-panel" });
+  tour.innerHTML = `
+    <div class="tour-copy">
+      <span class="badge">20-SECOND PRODUCT TOUR</span>
+      <h2>See how SkillBridge helps you plan a career with evidence</h2>
+      <p class="muted">A local, self-contained walkthrough — no external video host, no tracking.</p>
+    </div>
+    <video controls preload="metadata" playsinline poster="/assets/tour-poster.png">
+      <source src="/assets/skillbridge-tour.webm" type="video/webm" />
+      <source src="/assets/skillbridge-tour.mp4" type="video/mp4" />
+      Your browser does not support HTML video.
+    </video>`;
+  view.append(tour);
   try {
     const p = await api("/progress");
     defs.forEach(([, key], i) => { cards.children[i].querySelector(".v").textContent = p[key]; });
@@ -337,7 +370,7 @@ function viewSettings(view) {
   view.append(head("Settings", "Account and data"));
   const panel = el("div", { className: "panel" });
   panel.innerHTML = `<h2>Account</h2><p class="muted">${esc(me.name)} — ${esc(me.email)} <span class="badge">${esc(me.role)}</span></p>`;
-  const note = el("p", { className: "muted tiny", innerHTML: "AI features require a Gemini key configured on the backend. Your data stays on the server you connect to." });
+  const note = el("p", { className: "muted tiny", innerHTML: "Career guidance uses verified O*NET references by default. Optional text generation is managed privately by the server operator. Your data stays on the server you connect to." });
   panel.append(note);
   view.append(panel);
 }

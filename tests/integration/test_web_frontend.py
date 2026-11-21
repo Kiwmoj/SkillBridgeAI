@@ -10,9 +10,10 @@ def test_root_serves_spa(client):
 
 
 def test_static_assets_served(client):
-    for path in ("/app.js", "/styles.css"):
+    for path in ("/app.js", "/styles.css", "/assets/tour-poster.png",
+                 "/assets/skillbridge-tour.webm", "/assets/skillbridge-tour.mp4"):
         res = client.get(path)
-        assert res.status_code == 200 and len(res.text) > 0
+        assert res.status_code == 200 and len(res.content) > 100
 
 
 def test_api_and_legacy_routes_coexist_with_frontend(client):
