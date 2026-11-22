@@ -63,3 +63,24 @@ def test_profile_pathways_and_recommendations_follow_level(client, token):
     set_level(client, token, "advanced")
     advanced = client.get(f"{API}/occupations/{occupation_id}/profile", headers=auth(token)).json()
     assert advanced["level"] == "advanced" and advanced["getting_started"] != beginner_tips
+
+def test_skill_gap_resolves_loose_titles_and_explains_what_it_could_not_match(client, token):
+    # "nurse" is an alternate title of Registered Nurses; everyday wording maps to descriptors.
+    gap = client.post(f"{API}/skill-gap", headers=auth(token), json={
+        "occupation_title": "nurse", "current_skills": ["listening", "i like pizza"]})
+    assert gap.status_code == 200
+    body = gap.json()
+    assert body["occupation"] == "Registered Nurses"
+    assert [s["name"] for s in body["strengths"]] == ["Active Listening"]
+    assert body["strengths"][0]["matched_from"] == ["listening"]
+    assert body["unmatched"] == ["i like pizza"]
+    assert "not an exact O*NET title" in body["notice"]
+    assert all("id" in s and "title" in s for s in body["suggestions"])
+
+    unknown = client.post(f"{API}/skill-gap", headers=auth(token), json={
+        "occupation_title": "zzzz unknown job", "current_skills": []}).json()
+    assert unknown["source"] == "Not verified against O*NET" and unknown["strengths"] == [] and unknown["gaps"] == []
+
+    by_id = client.post(f"{API}/skill-gap", headers=auth(token), json={
+        "occupation_id": body["occupation_id"], "current_skills": []}).json()
+    assert by_id["occupation"] == "Registered Nurses" and by_id["strengths"] == []

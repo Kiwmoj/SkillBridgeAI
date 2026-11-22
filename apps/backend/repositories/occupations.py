@@ -1,4 +1,4 @@
-from sqlalchemy import case, delete, func, or_, select
+from sqlalchemy import and_, case, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from apps.backend.models import AlternateTitle, CustomOccupation, Descriptor, Occupation, RelatedOccupation, SavedCareer
@@ -18,38 +18,70 @@ def _search_stem(text: str) -> str:
     return word
 
 
-def search(db: Session, text: str, limit: int) -> list[Occupation]:
-    match = _like_pattern(_search_stem(text))
+def _escape(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _ranked_ids(db: Session, text: str, filters, limit: int) -> list[int]:
+    """Occupation IDs best first: exact title, then title/alternate-title word matches, then looser matches.
+
+    Ties prefer the base occupation (.00 code) and then the shorter, more general title.
+    """
+    phrase = text.strip().lower()
+    stem = _escape(_search_stem(text).lower())
+    title, alt = func.lower(Occupation.title), func.lower(AlternateTitle.title)
     rank = case(
-        (Occupation.title.ilike(match, escape="\\"), 0),
-        (AlternateTitle.title.ilike(match, escape="\\"), 1),
-        (Occupation.onet_soc_code.ilike(match, escape="\\"), 1),
-        else_=2,
+        (title == phrase, 0),
+        (alt == phrase, 0),
+        (title.like(f"{stem}%", escape="\\"), 1),
+        (title.like(f"% {stem}%", escape="\\"), 1),
+        (alt.like(f"{stem}%", escape="\\"), 2),
+        (alt.like(f"% {stem}%", escape="\\"), 2),
+        (title.like(f"%{stem}%", escape="\\"), 3),
+        (alt.like(f"%{stem}%", escape="\\"), 4),
+        (Occupation.onet_soc_code.like(f"%{stem}%", escape="\\"), 4),
+        else_=5,
     )
-    best = func.min(rank)
-    ids = (
+    base_code = case((Occupation.onet_soc_code.like("%.00"), 0), else_=1)
+    rows = (
         db.query(Occupation.id)
         .join(AlternateTitle, isouter=True)
-        .filter(
-            Occupation.dataset_version.is_not(None),
-            or_(
-                Occupation.title.ilike(match, escape="\\"),
-                Occupation.description.ilike(match, escape="\\"),
-                Occupation.onet_soc_code.ilike(match, escape="\\"),
-                AlternateTitle.title.ilike(match, escape="\\"),
-            ),
-        )
+        .filter(Occupation.dataset_version.is_not(None), filters)
         .group_by(Occupation.id, Occupation.title)
-        .order_by(best, Occupation.title, Occupation.id)
+        .order_by(func.min(rank), func.min(base_code), func.length(Occupation.title), Occupation.title, Occupation.id)
         .limit(limit)
         .all()
     )
-    order = [row[0] for row in ids]
+    return [row[0] for row in rows]
+
+
+def search(db: Session, text: str, limit: int) -> list[Occupation]:
+    stem = _escape(_search_stem(text).lower())
+    match = f"%{stem}%"
+    phrase_filter = or_(
+        func.lower(Occupation.title).like(match, escape="\\"),
+        func.lower(Occupation.description).like(match, escape="\\"),
+        func.lower(Occupation.onet_soc_code).like(match, escape="\\"),
+        func.lower(AlternateTitle.title).like(match, escape="\\"),
+    )
+    order = _ranked_ids(db, text, phrase_filter, limit)
+    if not order:
+        # "computer science teacher": every word must appear somewhere, in any order.
+        words = [_escape(_search_stem(word).lower()) for word in text.split() if len(word) >= 3]
+        if len(words) > 1:
+            word_filters = [
+                or_(
+                    func.lower(Occupation.title).like(f"%{word}%", escape="\\"),
+                    func.lower(AlternateTitle.title).like(f"%{word}%", escape="\\"),
+                    func.lower(Occupation.description).like(f"%{word}%", escape="\\"),
+                )
+                for word in words
+            ]
+            order = _ranked_ids(db, text, and_(*word_filters), limit)
     if not order:
         return []
     found = {item.id: item for item in db.query(Occupation).filter(Occupation.id.in_(order)).all()}
     return [found[i] for i in order]
-
 
 
 def get_active(db: Session, occupation_id: int) -> Occupation | None:
@@ -119,6 +151,17 @@ def skill_descriptors(db: Session, occupation_id: int) -> list[Descriptor]:
         db.query(Descriptor)
         .filter(Descriptor.occupation_id == occupation_id, Descriptor.category.in_(RATED_SKILL_CATEGORIES))
         .order_by(Descriptor.category, Descriptor.name, Descriptor.id)
+        .all()
+    )
+
+
+def work_style_descriptors(db: Session, occupation_id: int) -> list[Descriptor]:
+    """Work styles (for example Leadership or Cooperation) rated on the importance scale."""
+    return (
+        db.query(Descriptor)
+        .filter(Descriptor.occupation_id == occupation_id, Descriptor.category == "Work Styles",
+                Descriptor.scale == "WI")
+        .order_by(Descriptor.name, Descriptor.id)
         .all()
     )
 

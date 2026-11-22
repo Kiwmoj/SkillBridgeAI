@@ -423,34 +423,52 @@ function viewSkillGap(view) {
   view.append(levelNote());
   const panel = el("div", { className: "panel" });
   const title = el("input", { placeholder: "Occupation title (e.g. Registered Nurses)" });
-  const skills = el("textarea", { placeholder: "One skill per line, e.g.\nCritical Thinking\nActive Listening\nPatient care" });
+  const skills = el("textarea", { placeholder: "One skill per line, e.g.\nCritical Thinking\nCommunication\nPython\nPatient care" });
   const btn = labeled(el("button", { textContent: "Analyze", type: "button" }));
-  panel.append(el("label", {}, "Occupation", title), el("label", {}, "Current skills", skills), btn);
+  panel.append(el("label", {}, "Occupation", title), el("label", {}, "Current skills", skills), btn,
+    el("p", { className: "muted tiny", style: "margin-top:10px" }, "No skills yet? Leave it empty to see the most important skills to start with."));
   const out = el("div", {});
   panel.append(out);
   view.append(panel);
-  btn.addEventListener("click", async () => {
-    if (!title.value.trim()) { toast("Enter an occupation first."); return; }
+
+  const skillList = () => skills.value.split("\n").map((s) => s.trim()).filter(Boolean);
+  const chips = (arr, cls, cap = 24) => arr.length
+    ? `<div class="chips">${[...arr].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, cap).map((x) =>
+      `<span class="chip ${cls}" ${x.matched_from ? `title="From: ${esc(x.matched_from.join(", "))}"` : ""}>${esc(x.name)}${x.rating != null ? ` · ${esc(x.rating)}` : ""}</span>`).join("")}${arr.length > cap ? `<span class="chip">+${arr.length - cap} more</span>` : ""}</div>`
+    : '<p class="muted">None found.</p>';
+
+  async function run(body) {
     out.innerHTML = skeleton(2);
     setBusy(btn, true, "Analyzing…");
     try {
-      const r = await api("/skill-gap", { method: "POST", body: {
-        occupation_title: title.value.trim(),
-        current_skills: skills.value.split("\n").map((s) => s.trim()).filter(Boolean),
-      }});
-      const chips = (arr, cls, cap = 24) => arr.length
-        ? `<div class="chips">${[...arr].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, cap).map((x) => `<span class="chip ${cls}">${esc(x.name)}${x.rating != null ? ` · ${esc(x.rating)}` : ""}</span>`).join("")}${arr.length > cap ? `<span class="chip">+${arr.length - cap} more</span>` : ""}</div>`
-        : '<p class="muted">None found.</p>';
+      const r = await api("/skill-gap", { method: "POST", body: { ...body, current_skills: skillList() } });
+      const found = r.source !== "Not verified against O*NET";
       const rest = r.gaps.filter((g) => !(r.focus || []).some((f) => f.name === g.name));
+      const suggestions = (r.suggestions || []).length
+        ? `<div class="notice" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3);color:#cfe0ff">Not the career you meant? Try: <span class="chips" id="sg-suggest"></span></div>` : "";
       out.innerHTML =
-        `<div class="row center" style="margin-top:18px"><h2 class="grow">${esc(r.occupation)}</h2><span class="badge">${esc(r.source)}</span><span class="badge">${esc(levelName())} view</span></div>` +
+        `<div class="row center" style="margin-top:18px"><h2 class="grow">${esc(r.occupation)}</h2><span class="badge">${esc(r.source)}</span>${found ? `<span class="badge">${esc(levelName())} view</span>` : ""}</div>` +
         (r.notice ? `<div class="notice">${esc(r.notice)}</div>` : "") +
         (r.source_url ? `<p class="tiny"><a href="${esc(r.source_url)}" target="_blank" rel="noopener">Verify on O*NET OnLine ↗</a></p>` : "") +
-        (r.guidance ? `<div class="level-banner" style="margin-top:14px"><b>Start here</b><div class="muted">${esc(r.guidance)}</div></div>${chips(r.focus || [], "gap", 12)}` : "") +
-        `<h2 style="margin-top:16px">Strengths you already have</h2>${r.strengths.length ? chips(r.strengths, "good") : '<p class="muted">Nothing listed yet. That is fine, add skills above, or just follow the Start here list.</p>'}` +
+        suggestions +
+        (found && r.guidance ? `<div class="level-banner" style="margin-top:14px"><b>Start here</b><div class="muted">${esc(r.guidance)}</div></div>${chips(r.focus || [], "gap", 12)}` : "") +
+        (found ? `<h2 style="margin-top:16px">Strengths you already have</h2>${r.strengths.length ? chips(r.strengths, "good") : '<p class="muted">Nothing matched yet. That is fine: add skills above, or just follow the Start here list.</p>'}` : "") +
+        ((r.tools_known || []).length ? `<h2 style="margin-top:16px">Tools you already know</h2><div class="chips">${r.tools_known.map((t) => `<span class="chip good">${esc(t)}</span>`).join("")}</div>` : "") +
+        ((r.unmatched || []).length ? `<div class="notice" style="margin-top:14px">We could not match: ${r.unmatched.map(esc).join(", ")}. Try everyday names such as communication, teamwork, problem solving, math, or programming.</div>` : "") +
         (rest.length ? `<details style="margin-top:16px"><summary class="muted">See all other skills for this career (${rest.length})</summary>${chips(rest, "gap", 40)}</details>` : "");
+      const holder = out.querySelector("#sg-suggest");
+      (r.suggestions || []).forEach((s) => {
+        const b = el("button", { className: "ghost small", type: "button" }, s.title);
+        b.addEventListener("click", () => { title.value = s.title; run({ occupation_id: s.id }); });
+        holder.append(b);
+      });
     } catch (e) { out.innerHTML = errorBox(e.message); } finally { setBusy(btn, false, "Analyzing…"); }
+  }
+  btn.addEventListener("click", () => {
+    if (!title.value.trim()) { toast("Enter an occupation first."); return; }
+    run({ occupation_title: title.value.trim() });
   });
+  title.addEventListener("keydown", (e) => { if (e.key === "Enter") btn.click(); });
 }
 
 // ---------- Roadmaps ----------
