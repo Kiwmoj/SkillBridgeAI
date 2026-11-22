@@ -1,4 +1,4 @@
-"""Portfolio Builder: private image storage, metadata, organisation, and optional AI review."""
+"""Portfolio Builder: private image and PDF storage, metadata, organisation, and optional AI review."""
 import io
 from pathlib import Path
 from uuid import uuid4
@@ -38,18 +38,29 @@ def sanitize_image(content: bytes) -> bytes:
             sanitized = io.BytesIO()
             rgb.save(sanitized, format="PNG")
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError):
-        raise BadRequest("Upload a valid PNG, JPEG, WEBP, or GIF image.") from None
+        raise BadRequest("Upload a valid PDF, PNG, JPEG, WEBP, or GIF file.") from None
     return sanitized.getvalue()
 
 
+def validate_pdf(content: bytes) -> bytes:
+    """Accept only files that really are PDFs: magic header and a closing marker, within the size limit."""
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise PayloadTooLarge("Portfolio file exceeds 10 MB")
+    if not content.startswith(b"%PDF-") or b"%%EOF" not in content[-2048:]:
+        raise BadRequest("Upload a valid PDF, PNG, JPEG, WEBP, or GIF file.")
+    return content
+
+
 def store_upload(db: Session, user: User, filename: str | None, content: bytes, upload_dir: Path):
-    sanitized = sanitize_image(content)
+    is_pdf = content.startswith(b"%PDF-")
+    stored_bytes = validate_pdf(content) if is_pdf else sanitize_image(content)
+    extension, mime = (".pdf", "application/pdf") if is_pdf else (".png", "image/png")
     upload_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    stored_name = f"{uuid4().hex}.png"
+    stored_name = f"{uuid4().hex}{extension}"
     target = upload_dir / stored_name
-    target.write_bytes(sanitized)
+    target.write_bytes(stored_bytes)
     item = repository.add_item(
-        db, user.id, Path((filename or "portfolio").replace("\\", "/")).name[:255], stored_name, "image/png",
+        db, user.id, Path((filename or "portfolio").replace("\\", "/")).name[:255], stored_name, mime,
     )
     try:
         db.commit()
@@ -75,7 +86,9 @@ def serialize(item) -> dict:
         "featured": bool(item.featured),
         "evaluation": item.evaluation,
         "created_at": item.created_at.isoformat(),
-        "image_url": f"/api/v1/portfolio/{item.id}/image",
+        "mime_type": item.mime_type,
+        "kind": "pdf" if item.mime_type == "application/pdf" else "image",
+        "file_url": f"/api/v1/portfolio/{item.id}/file",
     }
 
 
@@ -119,6 +132,8 @@ def review(db: Session, user: User, portfolio_id: int, upload_dir: Path) -> dict
     item = repository.get_item(db, user.id, portfolio_id)
     if not item:
         raise NotFoundError("Portfolio item not found")
+    if item.mime_type == "application/pdf":
+        raise BadRequest("AI review currently supports images only. PDFs are stored and can be viewed or downloaded.")
     try:
         image_bytes = (upload_dir / Path(item.stored_path).name).read_bytes()
     except FileNotFoundError:

@@ -573,13 +573,18 @@ function viewProjects(view) {
 }
 
 // ---------- Portfolio ----------
+async function fileBlobUrl(item) {
+  const res = await fetch(item.file_url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error("Could not load the file.");
+  return URL.createObjectURL(await res.blob());
+}
 function viewPortfolio(view) {
   view.append(head("Portfolio", "Upload and organize your work"));
   const panel = el("div", { className: "panel" });
-  const file = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif" });
+  const file = el("input", { type: "file", accept: "application/pdf,image/png,image/jpeg,image/webp,image/gif" });
   const btn = labeled(el("button", { textContent: "Upload", type: "button" }));
-  panel.append(el("label", {}, "Image file", file), btn,
-    el("p", { className: "muted tiny", style: "margin-top:10px" }, "Files stay on the server you connect to. AI portfolio review is only available when the server operator enables it."));
+  panel.append(el("label", {}, "PDF or image file (up to 10 MB)", file), btn,
+    el("p", { className: "muted tiny", style: "margin-top:10px" }, "Files stay on the server you connect to. PDFs can be viewed and downloaded; AI review works on images only, and only when the server operator enables it."));
   const msg = el("div", {});
   panel.append(msg);
   view.append(panel);
@@ -591,13 +596,31 @@ function viewPortfolio(view) {
     try {
       const items = await api("/portfolio");
       list.innerHTML = "";
-      if (!items.length) { list.innerHTML = `<div class="panel">${empty("Your portfolio is empty", "Upload an image of your work to get started.")}</div>`; return; }
+      if (!items.length) { list.innerHTML = `<div class="panel">${empty("Your portfolio is empty", "Upload a PDF or an image of your work to get started.")}</div>`; return; }
       const panelList = el("section", { className: "panel" });
       panelList.append(el("h2", {}, `${items.length} item${items.length === 1 ? "" : "s"}`));
       items.forEach((it) => {
         const row = el("div", { className: "list-item" });
-        row.innerHTML = `<div class="row center"><h3 class="grow">${esc(it.title || it.filename)}</h3><span class="badge">${fmtDate(it.created_at)}</span></div>
+        row.innerHTML = `<div class="row center"><h3 class="grow">${esc(it.title || it.filename)}</h3><span class="badge ${it.kind === "pdf" ? "warn" : ""}">${it.kind === "pdf" ? "PDF" : "Image"}</span><span class="badge">${fmtDate(it.created_at)}</span></div>
           <div class="muted tiny">${esc(it.filename)}</div>${it.evaluation ? `<div class="result">${esc(typeof it.evaluation === "string" ? it.evaluation : JSON.stringify(it.evaluation, null, 2))}</div>` : ""}`;
+        const view = el("button", { className: "small", type: "button", textContent: it.kind === "pdf" ? "View PDF" : "View image" });
+        view.addEventListener("click", async () => {
+          const tab = window.open("", "_blank");
+          try { const url = await fileBlobUrl(it); if (tab) tab.location.href = url; else toast("Allow pop-ups to view the file."); }
+          catch (e) { if (tab) tab.close(); toast(e.message); }
+        });
+        const download = el("button", { className: "ghost small", type: "button", textContent: "Download" });
+        download.addEventListener("click", async () => {
+          try { const a = el("a", { href: await fileBlobUrl(it), download: it.filename }); document.body.append(a); a.click(); a.remove(); }
+          catch (e) { toast(e.message); }
+        });
+        const bar = el("div", { className: "row center", style: "margin-top:10px" }, view, download);
+        if (it.kind === "image") {
+          const img = el("img", { alt: it.title || it.filename, style: "max-width:220px;max-height:140px;border-radius:10px;border:1px solid var(--border);margin-top:10px;display:block" });
+          fileBlobUrl(it).then((url) => { img.src = url; }).catch(() => img.remove());
+          row.append(img);
+        }
+        row.append(bar);
         panelList.append(row);
       });
       list.append(panelList);
