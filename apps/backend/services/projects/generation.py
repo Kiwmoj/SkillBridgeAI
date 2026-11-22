@@ -51,7 +51,7 @@ def build_source_brief(profile: dict, title: str, experience: str, level: str = 
         "Goal: complete a small, realistic piece of work modelled on what this occupation actually does.",
         "",
         "Real tasks this project simulates:",
-        *[f"  ? {task}" for task in tasks],
+        *[f"  • {task}" for task in tasks],
         "",
         "Skills you will practise: " + (", ".join(skills) if skills else "see the career profile"),
     ]

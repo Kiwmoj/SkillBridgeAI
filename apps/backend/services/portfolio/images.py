@@ -101,7 +101,12 @@ def update_details(db: Session, user_id: int, portfolio_id: int, fields: dict) -
         raise NotFoundError("Project not found")
     if "tags" in fields and fields["tags"] is not None:
         fields["tags"] = ", ".join(tag.strip() for tag in fields["tags"] if tag.strip())[:255]
+    for key in ("title", "description"):
+        if key in fields and isinstance(fields[key], str):
+            fields[key] = fields[key].strip() or None
     for key, value in fields.items():
+        if key == "featured" and value is None:
+            continue
         setattr(item, key, value)
     db.commit()
     db.refresh(item)

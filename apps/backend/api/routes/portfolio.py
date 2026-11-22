@@ -5,7 +5,7 @@ from apps.backend.api.dependencies import CurrentUser, DbSession
 from apps.backend.core import config
 from apps.backend.core.exceptions import NotFoundError
 from apps.backend.repositories import portfolio as repository
-from apps.backend.schemas.portfolio import PortfolioReviewRequest
+from apps.backend.schemas.portfolio import PortfolioReviewRequest, PortfolioUpdateRequest
 from apps.backend.services.portfolio import images
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -21,6 +21,17 @@ def upload_portfolio(user: CurrentUser, db: DbSession, file: UploadFile = File(.
 @router.get("")
 def list_portfolios(user: CurrentUser, db: DbSession):
     return images.list_items(db, user.id)
+
+
+@router.patch("/{portfolio_id}")
+def update_portfolio(portfolio_id: int, request: PortfolioUpdateRequest, user: CurrentUser, db: DbSession):
+    return images.update_details(db, user.id, portfolio_id, request.model_dump(exclude_unset=True))
+
+
+@router.delete("/{portfolio_id}")
+def delete_portfolio(portfolio_id: int, user: CurrentUser, db: DbSession):
+    images.delete_item(db, user.id, portfolio_id, config.settings.upload_dir)
+    return {"deleted": True}
 
 
 @router.get("/{portfolio_id}/file")

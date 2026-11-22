@@ -282,6 +282,27 @@ async function viewDashboard(view) {
     recPanel.append(chips);
   }).catch((e) => { recPanel.innerHTML = "<h2>Careers to explore at your level</h2>" + errorBox(e.message); });
 
+  const portPanel = el("section", { className: "panel", innerHTML: `<h2>Your portfolio</h2>${skeleton(1)}` });
+  view.append(portPanel);
+  api("/portfolio").then((items) => {
+    portPanel.innerHTML = "<h2>Your portfolio</h2>";
+    if (!items.length) {
+      portPanel.insertAdjacentHTML("beforeend", empty("No work added yet", "Upload a PDF or image of a project or achievement to start building your portfolio."));
+    } else {
+      const ordered = [...items].sort((a, b) => Number(b.featured) - Number(a.featured)).slice(0, 4);
+      const chips = el("div", { className: "chips" });
+      ordered.forEach((it) => {
+        const b = el("button", { className: "ghost small", type: "button" }, `${it.featured ? "★ " : ""}${it.title || it.filename}`);
+        b.addEventListener("click", () => openPortfolioFile(it));
+        chips.append(b);
+      });
+      portPanel.append(el("p", { className: "muted tiny" }, `${items.length} item${items.length === 1 ? "" : "s"} · ${items.filter((i) => i.featured).length} featured`), chips);
+    }
+    const manage = el("button", { className: "small", type: "button", style: "margin-top:12px" }, "Open portfolio");
+    manage.addEventListener("click", () => go("Portfolio"));
+    portPanel.append(manage);
+  }).catch((e) => { portPanel.innerHTML = "<h2>Your portfolio</h2>" + errorBox(e.message); });
+
   const quick = el("section", { className: "panel" });
   quick.append(el("h2", {}, "Jump in"));
   const row = el("div", { className: "row" });
@@ -527,7 +548,7 @@ function viewProjects(view) {
   async function load() {
     list.innerHTML = skeleton(2);
     try {
-      const projects = await api("/projects");
+      const [projects, portfolioItems] = await Promise.all([api("/projects"), api("/portfolio").catch(() => [])]);
       list.innerHTML = "";
       if (!projects.length) { list.innerHTML = `<div class="panel">${empty("No projects yet", "Generate a project above to get a brief and milestones.")}</div>`; return; }
       projects.forEach((p) => {
@@ -545,6 +566,21 @@ function viewProjects(view) {
           ul.append(el("li", { className: m.done ? "done" : "" }, cb, el("span", {}, m.title)));
         });
         card.append(ul);
+        const attached = portfolioItems.filter((i) => i.project_id === p.id);
+        const showcase = el("div", { style: "margin-top:12px" });
+        showcase.append(el("h2", {}, `Portfolio pieces (${attached.length})`));
+        attached.forEach((it) => {
+          const open = el("button", { className: "ghost small", type: "button", textContent: `${it.kind === "pdf" ? "PDF" : "Image"}: ${it.title || it.filename}` });
+          open.addEventListener("click", () => openPortfolioFile(it));
+          showcase.append(open, " ");
+        });
+        const add = el("button", { className: p.progress === 100 || p.status === "completed" ? "small" : "ghost small", type: "button", textContent: "Add work to portfolio" });
+        add.addEventListener("click", () => { portfolioPreset = p.id; go("Portfolio"); });
+        showcase.append(add);
+        if ((p.progress === 100 || p.status === "completed") && !attached.length) {
+          showcase.append(el("p", { className: "muted tiny" }, "Project finished! Add your write-up or results to your portfolio."));
+        }
+        card.append(showcase);
         const select = el("select");
         PROJECT_STATUSES.forEach((s) => select.append(el("option", { value: s, selected: s === p.status }, s.replace("_", " "))));
         select.addEventListener("change", () => patch(p, { status: select.value }));
@@ -573,56 +609,122 @@ function viewProjects(view) {
 }
 
 // ---------- Portfolio ----------
+let portfolioPreset = null; // project id chosen via "Add to portfolio" in Project Studio
 async function fileBlobUrl(item) {
   const res = await fetch(item.file_url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error("Could not load the file.");
   return URL.createObjectURL(await res.blob());
 }
+async function openPortfolioFile(it) {
+  const tab = window.open("", "_blank");
+  try { const url = await fileBlobUrl(it); if (tab) tab.location.href = url; else toast("Allow pop-ups to view the file."); }
+  catch (e) { if (tab) tab.close(); toast(e.message); }
+}
+
 function viewPortfolio(view) {
-  view.append(head("Portfolio", "Upload and organize your work"));
+  view.append(head("Portfolio", "Showcase your work: upload, organize, and connect it to your projects"));
+  let projects = [];
+  let filter = "all";
   const panel = el("div", { className: "panel" });
   const file = el("input", { type: "file", accept: "application/pdf,image/png,image/jpeg,image/webp,image/gif" });
-  const btn = labeled(el("button", { textContent: "Upload", type: "button" }));
-  panel.append(el("label", {}, "PDF or image file (up to 10 MB)", file), btn,
-    el("p", { className: "muted tiny", style: "margin-top:10px" }, "Files stay on the server you connect to. PDFs can be viewed and downloaded; AI review works on images only, and only when the server operator enables it."));
+  const title = el("input", { placeholder: "Title (e.g. Patient intake redesign)", maxLength: 255 });
+  const desc = el("textarea", { placeholder: "What is it, and what did you learn? (optional)", style: "min-height:70px" });
+  const tags = el("input", { placeholder: "Tags, separated by commas (e.g. design, nursing)" });
+  const projectSelect = el("select", { style: "width:100%;margin-top:6px;padding:11px 13px" });
+  const btn = labeled(el("button", { textContent: "Add to portfolio", type: "button" }));
+  panel.append(
+    el("h2", {}, "Add work"),
+    el("label", {}, "PDF or image file (up to 10 MB)", file),
+    el("label", {}, "Title", title), el("label", {}, "Description", desc), el("label", {}, "Tags", tags),
+    el("label", {}, "Project (optional)", projectSelect), btn,
+    el("p", { className: "muted tiny", style: "margin-top:10px" }, "Files stay on the server you connect to and are private to you. PDFs can be viewed and downloaded; AI review works on images only, and only when the server operator enables it."));
   const msg = el("div", {});
   panel.append(msg);
   view.append(panel);
+  const filters = el("div", { className: "chips", style: "margin-top:18px" });
+  view.append(filters);
   const list = el("div", {});
   view.append(list);
+
+  function fillProjects(select, current) {
+    select.innerHTML = "";
+    select.append(el("option", { value: "" }, "No project"));
+    projects.forEach((p) => select.append(el("option", { value: p.id, selected: p.id === current }, p.title)));
+  }
+  const tagList = (text) => text.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 10);
+
+  async function patch(it, body, done) {
+    try { await api(`/portfolio/${it.id}`, { method: "PATCH", body }); toast(done || "Saved."); load(); } catch (e) { toast(e.message); }
+  }
+
+  function renderItem(it) {
+    const row = el("div", { className: "list-item" });
+    const project = projects.find((p) => p.id === it.project_id);
+    row.innerHTML = `<div class="row center"><h3 class="grow">${it.featured ? "★ " : ""}${esc(it.title || it.filename)}</h3>
+      <span class="badge ${it.kind === "pdf" ? "warn" : ""}">${it.kind === "pdf" ? "PDF" : "Image"}</span><span class="badge">${fmtDate(it.created_at)}</span></div>
+      <div class="muted tiny">${esc(it.filename)}${project ? ` · Project: ${esc(project.title)}` : ""}</div>
+      ${it.description ? `<p>${esc(it.description)}</p>` : ""}
+      ${it.tags.length ? `<div class="chips">${it.tags.map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : ""}
+      ${it.evaluation ? `<div class="result">${esc(typeof it.evaluation === "string" ? it.evaluation : JSON.stringify(it.evaluation, null, 2))}</div>` : ""}`;
+    if (it.kind === "image") {
+      const img = el("img", { alt: it.title || it.filename, style: "max-width:240px;max-height:150px;border-radius:10px;border:1px solid var(--border);margin-top:10px;display:block" });
+      fileBlobUrl(it).then((url) => { img.src = url; }).catch(() => img.remove());
+      row.append(img);
+    }
+    const open = el("button", { className: "small", type: "button", textContent: it.kind === "pdf" ? "View PDF" : "View image" });
+    open.addEventListener("click", () => openPortfolioFile(it));
+    const download = el("button", { className: "ghost small", type: "button", textContent: "Download" });
+    download.addEventListener("click", async () => {
+      try { const a = el("a", { href: await fileBlobUrl(it), download: it.filename }); document.body.append(a); a.click(); a.remove(); }
+      catch (e) { toast(e.message); }
+    });
+    const feature = el("button", { className: "ghost small", type: "button", textContent: it.featured ? "★ Featured" : "☆ Feature" });
+    feature.addEventListener("click", () => patch(it, { featured: !it.featured }, it.featured ? "Removed from featured." : "Featured."));
+    const edit = el("button", { className: "ghost small", type: "button", textContent: "Edit" });
+    const del = el("button", { className: "danger small", type: "button", textContent: "Delete" });
+    del.addEventListener("click", async () => {
+      if (!confirm("Delete this item and its file?")) return;
+      try { await api(`/portfolio/${it.id}`, { method: "DELETE" }); toast("Deleted."); load(); } catch (e) { toast(e.message); }
+    });
+    row.append(el("div", { className: "row center", style: "margin-top:10px" }, open, download, feature, edit, del));
+
+    const form = el("div", { className: "hidden", style: "margin-top:12px" });
+    const eTitle = el("input", { value: it.title || "", placeholder: "Title" });
+    const eDesc = el("textarea", { value: it.description || "", placeholder: "Description", style: "min-height:70px" });
+    const eTags = el("input", { value: it.tags.join(", "), placeholder: "Tags, separated by commas" });
+    const eProject = el("select", { style: "width:100%;margin-top:6px;padding:11px 13px" });
+    fillProjects(eProject, it.project_id);
+    const save = el("button", { className: "small", type: "button", textContent: "Save changes" });
+    save.addEventListener("click", () => patch(it, {
+      title: eTitle.value.trim() || null, description: eDesc.value.trim() || null, tags: tagList(eTags.value),
+      project_id: eProject.value ? Number(eProject.value) : null,
+    }));
+    form.append(el("label", {}, "Title", eTitle), el("label", {}, "Description", eDesc), el("label", {}, "Tags", eTags),
+      el("label", {}, "Project", eProject), save);
+    edit.addEventListener("click", () => form.classList.toggle("hidden"));
+    row.append(form);
+    return row;
+  }
 
   async function load() {
     list.innerHTML = skeleton(2);
     try {
-      const items = await api("/portfolio");
-      list.innerHTML = "";
-      if (!items.length) { list.innerHTML = `<div class="panel">${empty("Your portfolio is empty", "Upload a PDF or an image of your work to get started.")}</div>`; return; }
-      const panelList = el("section", { className: "panel" });
-      panelList.append(el("h2", {}, `${items.length} item${items.length === 1 ? "" : "s"}`));
-      items.forEach((it) => {
-        const row = el("div", { className: "list-item" });
-        row.innerHTML = `<div class="row center"><h3 class="grow">${esc(it.title || it.filename)}</h3><span class="badge ${it.kind === "pdf" ? "warn" : ""}">${it.kind === "pdf" ? "PDF" : "Image"}</span><span class="badge">${fmtDate(it.created_at)}</span></div>
-          <div class="muted tiny">${esc(it.filename)}</div>${it.evaluation ? `<div class="result">${esc(typeof it.evaluation === "string" ? it.evaluation : JSON.stringify(it.evaluation, null, 2))}</div>` : ""}`;
-        const view = el("button", { className: "small", type: "button", textContent: it.kind === "pdf" ? "View PDF" : "View image" });
-        view.addEventListener("click", async () => {
-          const tab = window.open("", "_blank");
-          try { const url = await fileBlobUrl(it); if (tab) tab.location.href = url; else toast("Allow pop-ups to view the file."); }
-          catch (e) { if (tab) tab.close(); toast(e.message); }
-        });
-        const download = el("button", { className: "ghost small", type: "button", textContent: "Download" });
-        download.addEventListener("click", async () => {
-          try { const a = el("a", { href: await fileBlobUrl(it), download: it.filename }); document.body.append(a); a.click(); a.remove(); }
-          catch (e) { toast(e.message); }
-        });
-        const bar = el("div", { className: "row center", style: "margin-top:10px" }, view, download);
-        if (it.kind === "image") {
-          const img = el("img", { alt: it.title || it.filename, style: "max-width:220px;max-height:140px;border-radius:10px;border:1px solid var(--border);margin-top:10px;display:block" });
-          fileBlobUrl(it).then((url) => { img.src = url; }).catch(() => img.remove());
-          row.append(img);
-        }
-        row.append(bar);
-        panelList.append(row);
+      const [items, projs] = await Promise.all([api("/portfolio"), api("/projects")]);
+      projects = projs;
+      fillProjects(projectSelect, portfolioPreset);
+      filters.innerHTML = "";
+      const featuredCount = items.filter((i) => i.featured).length;
+      [["all", `All (${items.length})`], ["featured", `★ Featured (${featuredCount})`]].forEach(([key, label]) => {
+        const b = el("button", { className: filter === key ? "small" : "ghost small", type: "button" }, label);
+        b.addEventListener("click", () => { filter = key; load(); });
+        filters.append(b);
       });
+      const shown = filter === "featured" ? items.filter((i) => i.featured) : items;
+      list.innerHTML = "";
+      if (!items.length) { list.innerHTML = `<div class="panel">${empty("Your portfolio is empty", "Add a PDF or an image of your work above. Finished projects make great portfolio pieces.")}</div>`; return; }
+      if (!shown.length) { list.innerHTML = `<div class="panel">${empty("Nothing featured yet", "Click ☆ Feature on your best work to pin it here and on your dashboard.")}</div>`; return; }
+      const panelList = el("section", { className: "panel" });
+      shown.forEach((it) => panelList.append(renderItem(it)));
       list.append(panelList);
     } catch (e) { list.innerHTML = `<div class="panel">${errorBox(e.message)}</div>`; }
   }
@@ -634,9 +736,15 @@ function viewPortfolio(view) {
     setBusy(btn, true, "Uploading…");
     msg.innerHTML = "";
     try {
-      await api("/portfolio/upload", { method: "POST", form });
-      file.value = "";
-      toast("Uploaded.");
+      const created = await api("/portfolio/upload", { method: "POST", form });
+      const details = {};
+      if (title.value.trim()) details.title = title.value.trim();
+      if (desc.value.trim()) details.description = desc.value.trim();
+      if (tagList(tags.value).length) details.tags = tagList(tags.value);
+      if (projectSelect.value) details.project_id = Number(projectSelect.value);
+      if (Object.keys(details).length) await api(`/portfolio/${created.id}`, { method: "PATCH", body: details });
+      file.value = ""; title.value = ""; desc.value = ""; tags.value = ""; portfolioPreset = null;
+      toast("Added to your portfolio.");
       load();
     } catch (e) { msg.innerHTML = errorBox(e.message); } finally { setBusy(btn, false, "Uploading…"); }
   });
